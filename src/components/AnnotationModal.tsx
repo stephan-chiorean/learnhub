@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Tag, Input } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
+import { Copy, Check } from 'lucide-react';
 
 interface AnnotationModalProps {
   isOpen: boolean;
@@ -16,23 +17,34 @@ interface AnnotationModalProps {
     endLine: number;
     filePath: string;
   } | null;
+  editingNote?: {
+    content: string;
+    tags: string[];
+  };
 }
-
-const TABS = ["Note", "Snippet"];
 
 const AnnotationModal: React.FC<AnnotationModalProps> = ({
   isOpen,
   onClose,
   onSave,
   selection,
+  editingNote,
 }) => {
-  const [activeTab, setActiveTab] = useState<string>('Note');
   const [noteContent, setNoteContent] = useState('');
-  const [snippetName, setSnippetName] = useState('');
-  const [snippetDescription, setSnippetDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [inputVisible, setInputVisible] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (editingNote) {
+      setNoteContent(editingNote.content);
+      setTags(editingNote.tags || []);
+    } else {
+      setNoteContent('');
+      setTags([]);
+    }
+  }, [editingNote]);
 
   const handleClose = (removedTag: string) => {
     const newTags = tags.filter(tag => tag !== removedTag);
@@ -56,36 +68,27 @@ const AnnotationModal: React.FC<AnnotationModalProps> = ({
   };
 
   const handleSave = () => {
-    if (activeTab === 'Note') {
-      if (noteContent.trim()) {
-        onSave({
-          type: 'note',
-          text: selection?.text,
-          content: noteContent,
-          startLine: selection?.startLine,
-          endLine: selection?.endLine,
-          filePath: selection?.filePath,
-          tags: tags,
-        });
-        setNoteContent('');
-        setTags([]);
-        onClose();
-      }
-    } else {
-      if (snippetName.trim()) {
-        onSave({
-          type: 'snippet',
-          name: snippetName,
-          description: snippetDescription,
-          text: selection?.text,
-          startLine: selection?.startLine,
-          endLine: selection?.endLine,
-          filePath: selection?.filePath,
-        });
-        setSnippetName('');
-        setSnippetDescription('');
-        onClose();
-      }
+    if (noteContent.trim()) {
+      onSave({
+        type: 'note',
+        text: selection?.text,
+        content: noteContent,
+        startLine: selection?.startLine,
+        endLine: selection?.endLine,
+        filePath: selection?.filePath,
+        tags: tags,
+      });
+      setNoteContent('');
+      setTags([]);
+      onClose();
+    }
+  };
+
+  const handleCopy = () => {
+    if (selection?.text) {
+      navigator.clipboard.writeText(selection.text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -95,100 +98,70 @@ const AnnotationModal: React.FC<AnnotationModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px] bg-white border-orange-200">
         <DialogHeader>
-          <DialogTitle className="text-orange-600">Add {activeTab}</DialogTitle>
+          <DialogTitle className="text-orange-600">
+            {editingNote ? 'Edit Note' : 'Add Note'}
+          </DialogTitle>
         </DialogHeader>
-        <div className="flex gap-2 mb-4">
-          {TABS.map(tab => (
-            <button
-              key={tab}
-              className={`flex-1 py-2 rounded-t-lg text-base font-medium transition-colors focus:outline-none ${
-                activeTab === tab
-                  ? 'bg-orange-50 border-b-2 border-orange-500 text-orange-700'
-                  : 'text-gray-500 hover:text-orange-600'
-              }`}
-              style={{ borderBottom: activeTab === tab ? '2px solid #f97316' : '2px solid transparent' }}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
             <Label className="text-gray-700">Selected Code</Label>
-            <div className="p-2 bg-gray-50 rounded-md text-sm font-mono border border-gray-200">
+            <div className="relative p-2 bg-gray-50 rounded-md text-sm font-mono border border-gray-200">
+              <button
+                onClick={handleCopy}
+                className="absolute top-2 right-2 p-1 hover:bg-gray-100 rounded transition-colors"
+                title="Copy code"
+              >
+                {copied ? (
+                  <Check className="w-4 h-4 text-green-600" />
+                ) : (
+                  <Copy className="w-4 h-4 text-gray-500" />
+                )}
+              </button>
               {selection.text}
             </div>
           </div>
-          {activeTab === 'Note' && (
-            <>
-              <div className="space-y-2">
-                <Label className="text-gray-700">Your Note</Label>
-                <Textarea
-                  value={noteContent}
-                  onChange={(e) => setNoteContent(e.target.value)}
-                  placeholder="Add your note here..."
-                  className="min-h-[100px] border-gray-200 focus:border-orange-300 focus:ring-orange-200 font-['Gaegu'] text-lg leading-tight"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-gray-700">Tags</Label>
-                <div className="flex flex-wrap gap-2">
-                  {tags.map((tag, index) => (
-                    <Tag
-                      key={tag}
-                      closable
-                      onClose={() => handleClose(tag)}
-                      className="bg-orange-50 text-orange-700 border-orange-200"
-                    >
-                      {tag}
-                    </Tag>
-                  ))}
-                  {inputVisible ? (
-                    <Input
-                      type="text"
-                      size="small"
-                      className="w-20"
-                      value={inputValue}
-                      onChange={handleInputChange}
-                      onBlur={handleInputConfirm}
-                      onPressEnter={handleInputConfirm}
-                    />
-                  ) : (
-                    <Tag
-                      onClick={showInput}
-                      className="bg-orange-50 text-orange-700 border-orange-200 cursor-pointer"
-                    >
-                      <PlusOutlined /> New Tag
-                    </Tag>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-          {activeTab === 'Snippet' && (
-            <>
-              <div className="space-y-2">
-                <Label className="text-gray-700">Snippet Name</Label>
-                <input
+          <div className="space-y-2">
+            <Label className="text-gray-700">Your Note</Label>
+            <Textarea
+              value={noteContent}
+              onChange={(e) => setNoteContent(e.target.value)}
+              placeholder="Add your note here..."
+              className="min-h-[100px] border-gray-200 focus:border-orange-300 focus:ring-orange-200 font-['Gaegu'] text-lg leading-tight"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-gray-700">Tags</Label>
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag, index) => (
+                <Tag
+                  key={tag}
+                  closable
+                  onClose={() => handleClose(tag)}
+                  className="bg-orange-50 text-orange-700 border-orange-200"
+                >
+                  {tag}
+                </Tag>
+              ))}
+              {inputVisible ? (
+                <Input
                   type="text"
-                  value={snippetName}
-                  onChange={e => setSnippetName(e.target.value)}
-                  placeholder="Enter a name for your snippet"
-                  className="w-full rounded border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+                  size="small"
+                  className="w-20"
+                  value={inputValue}
+                  onChange={handleInputChange}
+                  onBlur={handleInputConfirm}
+                  onPressEnter={handleInputConfirm}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-gray-700">Description (optional)</Label>
-                <Textarea
-                  value={snippetDescription}
-                  onChange={e => setSnippetDescription(e.target.value)}
-                  placeholder="Add a description..."
-                  className="min-h-[60px] border-gray-200 focus:border-orange-300 focus:ring-orange-200"
-                />
-              </div>
-            </>
-          )}
+              ) : (
+                <Tag
+                  onClick={showInput}
+                  className="bg-orange-50 text-orange-700 border-orange-200 cursor-pointer"
+                >
+                  <PlusOutlined /> New Tag
+                </Tag>
+              )}
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} className="border-gray-200 hover:bg-gray-50">
@@ -197,9 +170,9 @@ const AnnotationModal: React.FC<AnnotationModalProps> = ({
           <Button
             onClick={handleSave}
             className="bg-orange-500 hover:bg-orange-600 text-white"
-            disabled={activeTab === 'Note' ? !noteContent.trim() : !snippetName.trim()}
+            disabled={!noteContent.trim()}
           >
-            Save
+            {editingNote ? 'Update' : 'Save'}
           </Button>
         </DialogFooter>
       </DialogContent>

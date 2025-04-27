@@ -19,6 +19,7 @@ const CodeViewer: React.FC = () => {
     endLine: number
     filePath: string
   } | null>(null)
+  const [editingNote, setEditingNote] = useState<any>(null)
   const codeRef = useRef<HTMLDivElement>(null)
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null)
   const [notes, setNotes] = useState<any[]>([])
@@ -58,17 +59,19 @@ const CodeViewer: React.FC = () => {
   }
 
   const handleSaveAnnotation = (data: any) => {
-    if (!selection) return
-    if (data.type === 'note') {
+    if (!selection) return;
+    if (editingNote) {
+      // Update existing note
+      setNotes(prev => prev.map(note => 
+        note.id === editingNote.id ? { ...data, id: note.id } : note
+      ));
+      setEditingNote(null);
+    } else {
+      // Create new note
       setNotes(prev => [
         { ...data, id: `${Date.now()}-note` },
         ...prev
-      ])
-    } else if (data.type === 'snippet') {
-      setSnippets(prev => [
-        { ...data, id: `${Date.now()}-snippet` },
-        ...prev
-      ])
+      ]);
     }
   }
 
@@ -91,6 +94,22 @@ const CodeViewer: React.FC = () => {
       endLine: annotation.endLine
     });
     setSelectedAnnotationId(annotation.id);
+  };
+
+  const handleEditNote = (annotation: any) => {
+    setEditingNote(annotation);
+    setSelection({
+      text: annotation.text,
+      startLine: annotation.startLine,
+      endLine: annotation.endLine,
+      filePath: annotation.filePath,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteNote = (annotation: any) => {
+    setNotes(prev => prev.filter(note => note.id !== annotation.id));
+    setSnippets(prev => prev.filter(snippet => snippet.id !== annotation.id));
   };
 
   const getHighlightedLines = (): { lines: number[]; selectedLines: number[]; hoveredLines: number[]; clickedLines: number[] } => {
@@ -241,15 +260,21 @@ const CodeViewer: React.FC = () => {
               snippets={snippets}
               currentFilePath={path || ''}
               onAnnotationClick={handleAnnotationClick}
+              onEditNote={handleEditNote}
+              onDeleteNote={handleDeleteNote}
             />
           </div>
         </div>
       </div>
       <AnnotationModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingNote(null);
+        }}
         onSave={handleSaveAnnotation}
         selection={selection}
+        editingNote={editingNote}
       />
     </div>
   )
