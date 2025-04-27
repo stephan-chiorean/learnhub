@@ -38,6 +38,22 @@ interface GitHubErrorResponse {
   documentation_url?: string;
 }
 
+interface TreeItem {
+  path: string;
+  type: 'blob' | 'tree';
+  mode: string;
+  sha: string;
+  size?: number;
+  url: string;
+}
+
+interface TreeNode {
+  name: string;
+  path: string;
+  type: 'blob' | 'tree';
+  children?: TreeNode[];
+}
+
 // Helper function to handle GitHub API errors
 const handleGitHubError = (error: AxiosError): GitHubError => {
   if (error.response) {
@@ -79,6 +95,45 @@ const handleGitHubError = (error: AxiosError): GitHubError => {
   };
 };
 
+// Helper function to build nested tree structure
+const buildNestedTree = (items: TreeItem[]): TreeNode[] => {
+  const tree: TreeNode[] = [];
+  const pathMap: { [key: string]: TreeNode } = {};
+
+  // First pass: create all nodes
+  items.forEach(item => {
+    const pathParts = item.path.split('/');
+    const name = pathParts[pathParts.length - 1];
+    
+    const node: TreeNode = {
+      name,
+      path: item.path,
+      type: item.type,
+      children: item.type === 'tree' ? [] : undefined
+    };
+
+    pathMap[item.path] = node;
+  });
+
+  // Second pass: build hierarchy
+  items.forEach(item => {
+    const pathParts = item.path.split('/');
+    if (pathParts.length === 1) {
+      // Root level item
+      tree.push(pathMap[item.path]);
+    } else {
+      // Find parent path
+      const parentPath = pathParts.slice(0, -1).join('/');
+      const parent = pathMap[parentPath];
+      if (parent && parent.children) {
+        parent.children.push(pathMap[item.path]);
+      }
+    }
+  });
+
+  return tree;
+};
+
 // POST /api/createWorkspace
 app.post('/api/createWorkspace', async (req: Request, res: Response) => {
   try {
@@ -116,6 +171,9 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
       return res.status(status).json({ error: message });
     }
 
+    // Transform flat tree into nested structure
+    const nestedTree = buildNestedTree(treeResponse.data.tree);
+
     res.json({
       metadata: {
         name: repoData.name,
@@ -124,7 +182,7 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
         stars: repoData.stargazers_count,
         forks: repoData.forks_count,
       },
-      directoryTree: treeResponse.data.tree
+      directoryTree: nestedTree
     });
   } catch (error) {
     const { status, message } = handleGitHubError(error as AxiosError);

@@ -10,6 +10,7 @@ import ReactFlow, {
   useEdgesState,
   Position,
   NodeTypes,
+  Handle,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
@@ -21,19 +22,22 @@ interface FileNodeData {
   label: string
   type: 'file' | 'directory'
   path: string
+  isExpanded?: boolean
+  children?: any[]
 }
 
 const FileNode: React.FC<{ data: FileNodeData }> = ({ data }) => {
   return (
-    <div className={`px-4 py-2 rounded-lg shadow-sm border ${
+    <div className={`px-4 py-2 rounded-lg shadow-sm border cursor-pointer select-none ${
       data.type === 'directory' 
-        ? 'bg-orange-50 border-orange-200' 
-        : 'bg-white border-gray-200'
+        ? 'bg-orange-50 border-orange-200 hover:bg-orange-100' 
+        : 'bg-white border-gray-200 hover:bg-gray-50'
     }`}>
+      <Handle type="target" position={Position.Left} id="target" />
       <div className="flex items-center">
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className={`h-4 w-4 mr-2 ${
+          className={`h-4 w-4 mr-2 flex-shrink-0 ${
             data.type === 'directory' ? 'text-orange-500' : 'text-gray-500'
           }`}
           fill="none"
@@ -56,8 +60,9 @@ const FileNode: React.FC<{ data: FileNodeData }> = ({ data }) => {
             />
           )}
         </svg>
-        <span className="text-sm font-medium">{data.label}</span>
+        <span className="text-sm font-medium truncate">{data.label}</span>
       </div>
+      <Handle type="source" position={Position.Right} id="source" />
     </div>
   )
 }
@@ -69,121 +74,158 @@ const nodeTypes: NodeTypes = {
 const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
   const navigate = useNavigate()
-  const {
-    directoryTree,
-    isLoading,
-    error,
-    fetchDirectoryTree,
-  } = useWorkspace()
+  const { directoryTree, isLoading, error, fetchDirectoryTree } = useWorkspace()
 
   const [hasFetched, setHasFetched] = useState(false)
-  const [nodes, setNodes, onNodesChange] = useNodesState([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
-
-  const processTreeToNodes = useCallback((items: any[], parentId: string | null = null, level: number = 0) => {
-    const newNodes: Node[] = []
-    const newEdges: Edge[] = []
-    let xOffset = 0
-
-    items.forEach((item, index) => {
-      const nodeId = item.path
-      const isDirectory = item.type === 'tree'
-      const node: Node = {
-        id: nodeId,
-        type: 'fileNode',
-        position: { x: level * 250, y: index * 100 },
-        data: {
-          label: item.path.split('/').pop(),
-          type: isDirectory ? 'directory' : 'file',
-          path: item.path,
-        },
-        sourcePosition: Position.Right,
-        targetPosition: Position.Left,
-      }
-
-      newNodes.push(node)
-
-      if (parentId) {
-        newEdges.push({
-          id: `${parentId}-${nodeId}`,
-          source: parentId,
-          target: nodeId,
-          type: 'smoothstep',
-          animated: isDirectory,
-        })
-      }
-
-      if (item.children) {
-        const { nodes: childNodes, edges: childEdges } = processTreeToNodes(
-          item.children,
-          nodeId,
-          level + 1
-        )
-        newNodes.push(...childNodes)
-        newEdges.push(...childEdges)
-      }
-    })
-
-    return { nodes: newNodes, edges: newEdges }
-  }, [])
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node[]>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([])
 
   useEffect(() => {
     if (owner && repo && !hasFetched) {
+      console.log('Fetching directory tree for:', owner, repo)
       fetchDirectoryTree(owner, repo)
       setHasFetched(true)
     }
   }, [owner, repo, fetchDirectoryTree, hasFetched])
 
   useEffect(() => {
-    if (directoryTree.length > 0) {
-      const { nodes: newNodes, edges: newEdges } = processTreeToNodes(directoryTree)
+    if (directoryTree && directoryTree.length > 0) {
+      console.log('Processing directory tree:', directoryTree)
+      const { nodes: newNodes, edges: newEdges } = processTree(directoryTree)
+      console.log('Generated nodes:', newNodes)
+      console.log('Generated edges:', newEdges)
       setNodes(newNodes)
       setEdges(newEdges)
     }
-  }, [directoryTree, processTreeToNodes, setNodes, setEdges])
+  }, [directoryTree])
+
+  const createNode = (item: any, parentId: string | null, index: number, level: number = 0): Node => {
+    const x = level * 300;
+    const y = index * 100 + (level * 20);
+
+    return {
+      id: item.path,
+      type: 'fileNode',
+      position: { x, y },
+      data: {
+        label: item.name,
+        type: item.type === 'tree' ? 'directory' : 'file',
+        path: item.path,
+        children: item.children || [],
+        isExpanded: false,
+      },
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      parentNode: parentId || undefined,
+      style: {
+        width: 200,
+        height: 40,
+      },
+    };
+  }
+
+  const processTree = (items: any[], parentId: string | null = null, level: number = 0): { nodes: Node[], edges: Edge[] } => {
+    let nodes: Node[] = [];
+    let edges: Edge[] = [];
+
+    items.forEach((item, index) => {
+      const node = createNode(item, parentId, index, level);
+      nodes.push(node);
+
+      if (parentId) {
+        edges.push({
+          id: `${parentId}-${node.id}`,
+          source: parentId,
+          target: node.id,
+          sourceHandle: 'source',
+          targetHandle: 'target',
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: '#94a3b8' },
+        });
+      }
+
+      if (item.type === 'tree' && item.children && item.children.length > 0) {
+        const { nodes: childNodes, edges: childEdges } = processTree(item.children, node.id, level + 1);
+        nodes = [...nodes, ...childNodes];
+        edges = [...edges, ...childEdges];
+      }
+    });
+
+    return { nodes, edges };
+  }
+
+  const toggleFolder = (node: Node) => {
+    const fileData = node.data as FileNodeData
+    if (!fileData.children) return
+
+    const alreadyExpanded = fileData.isExpanded
+
+    if (alreadyExpanded) {
+      // collapse -> remove all children nodes recursively
+      const descendantIds = getAllDescendants(node.id)
+      setNodes((nds) => nds.filter((n) => !descendantIds.includes(n.id)))
+      setEdges((eds) => eds.filter((e) => !descendantIds.includes(e.source) && !descendantIds.includes(e.target)))
+      updateNodeData(node.id, { isExpanded: false })
+    } else {
+      // expand -> add children nodes
+      const childrenNodes = (fileData.children || []).map((child, index) => createNode(child, node.id, index, node.position.x / 300 + 1))
+      const childrenEdges = childrenNodes.map((child) => ({
+        id: `${node.id}-${child.id}`,
+        source: node.id,
+        target: child.id,
+        type: 'smoothstep',
+      }))
+      setNodes((nds) => [...nds, ...childrenNodes])
+      setEdges((eds) => [...eds, ...childrenEdges])
+      updateNodeData(node.id, { isExpanded: true })
+    }
+  }
+
+  const getAllDescendants = (parentId: string): string[] => {
+    const descendants: string[] = []
+    const stack = [parentId]
+
+    while (stack.length > 0) {
+      const currentId = stack.pop()!
+      nodes.forEach((node) => {
+        if (node.parentNode === currentId) {
+          descendants.push(node.id)
+          stack.push(node.id)
+        }
+      })
+    }
+
+    return descendants
+  }
+
+  const updateNodeData = (nodeId: string, newData: Partial<FileNodeData>) => {
+    setNodes((nds) => nds.map((node) => node.id === nodeId ? { ...node, data: { ...node.data, ...newData } } : node))
+  }
 
   const onNodeClick = (event: React.MouseEvent, node: Node) => {
+    event.stopPropagation()
     const data = node.data as FileNodeData
-    if (data.type === 'file' && owner && repo) {
+
+    if (data.type === 'directory') {
+      toggleFolder(node)
+    } else if (data.type === 'file' && owner && repo) {
       navigate(`/workspace/${owner}/${repo}/file?path=${encodeURIComponent(data.path)}`)
     }
   }
 
   if (isLoading) {
-    return (
-      <div className={`flex-1 overflow-auto p-6 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
-        <div className="max-w-4xl mx-auto">
-          <div className="animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
-            <div className="space-y-3">
-              <div className="h-4 bg-gray-200 rounded"></div>
-              <div className="h-4 bg-gray-200 rounded"></div>
-              <div className="h-4 bg-gray-200 rounded"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <div className={`flex-1 overflow-auto p-6 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>Loading...</div>
   }
 
   if (error) {
-    return (
-      <div className={`flex-1 overflow-auto p-6 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        </div>
-      </div>
-    )
+    return <div className={`flex-1 overflow-auto p-6 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>{error}</div>
   }
 
   return (
     <div className={`flex-1 overflow-auto p-6 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold mb-4">
-          {owner}/{repo}
-        </h1>
+        <h1 className="text-2xl font-bold mb-4">{owner}/{repo}</h1>
         <div className="bg-white rounded-lg shadow p-4" style={{ height: 'calc(100vh - 8rem)' }}>
           <ReactFlow
             nodes={nodes}
@@ -193,6 +235,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
             onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
             fitView
+            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+            minZoom={0.1}
+            maxZoom={2}
+            style={{ background: '#f8fafc' }}
+            panOnScroll
+            zoomOnScroll={false}
+            panOnDrag={false}
           >
             <Background />
             <Controls />
@@ -203,4 +252,4 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   )
 }
 
-export default Workspace 
+export default Workspace
