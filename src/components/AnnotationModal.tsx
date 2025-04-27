@@ -6,6 +6,8 @@ import { Label } from './ui/label';
 import { Tag, Input } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { Copy, Check } from 'lucide-react';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 interface AnnotationModalProps {
   isOpen: boolean;
@@ -96,7 +98,7 @@ const AnnotationModal: React.FC<AnnotationModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] bg-white border-orange-200">
+      <DialogContent className="sm:max-w-[1200px] bg-white border-orange-200">
         <DialogHeader>
           <DialogTitle className="text-orange-600">
             {editingNote ? 'Edit Note' : 'Add Note'}
@@ -105,10 +107,10 @@ const AnnotationModal: React.FC<AnnotationModalProps> = ({
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
             <Label className="text-gray-700">Selected Code</Label>
-            <div className="relative p-2 bg-gray-50 rounded-md text-sm font-mono border border-gray-200">
+            <div className="relative bg-gray-50 rounded-md border border-gray-200">
               <button
                 onClick={handleCopy}
-                className="absolute top-2 right-2 p-1 hover:bg-gray-100 rounded transition-colors"
+                className="absolute top-2 right-2 p-1 hover:bg-gray-100 rounded transition-colors z-10"
                 title="Copy code"
               >
                 {copied ? (
@@ -117,7 +119,19 @@ const AnnotationModal: React.FC<AnnotationModalProps> = ({
                   <Copy className="w-4 h-4 text-gray-500" />
                 )}
               </button>
-              {selection.text}
+              <SyntaxHighlighter
+                language="javascript"
+                style={docco}
+                customStyle={{ 
+                  margin: 0, 
+                  padding: '1rem',
+                  background: 'transparent',
+                  overflowX: 'auto'
+                }}
+                showLineNumbers={false}
+              >
+                {selection.text}
+              </SyntaxHighlighter>
             </div>
           </div>
           <div className="space-y-2">

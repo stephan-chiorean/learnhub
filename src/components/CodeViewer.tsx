@@ -49,8 +49,20 @@ const CodeViewer: React.FC = () => {
     const start = preSelectionRange.toString().split('\n').length - 1
     const end = start + selection.toString().split('\n').length - 1
 
+    // Get the actual code content without line numbers
+    const codeLines = currentFile?.content.split('\n') || []
+    const selectedLines = codeLines.slice(start, end + 1)
+    
+    // Remove any line numbers that might be in the selection
+    const cleanedLines = selectedLines.map(line => {
+      // Remove any leading numbers and spaces
+      return line.replace(/^\s*\d+\s*/, '')
+    })
+    
+    const selectedText = cleanedLines.join('\n')
+
     setSelection({
-      text: selection.toString(),
+      text: selectedText,
       startLine: start + 1,
       endLine: end + 1,
       filePath: path || '',
