@@ -1,17 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 
+export interface Annotation {
+  id: string;
+  text: string;
+  content: string;
+  startLine: number;
+  endLine: number;
+  filePath: string;
+}
+
 interface FileContent {
   content: string;
   path: string;
-}
-
-interface Annotation {
-  id: string;
-  filePath: string;
-  startLine: number;
-  endLine: number;
-  content: string;
 }
 
 interface WorkspaceContextType {
