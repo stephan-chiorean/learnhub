@@ -79,10 +79,10 @@ const Notepad: React.FC<NotepadProps> = ({
             >
               <div className="w-full px-4">
                 <div 
-                  className={`bg-white/90 border-2 rounded-lg transition-colors duration-200 relative cursor-pointer ${
+                  className={`bg-yellow-50 border-2 rounded-lg transition-colors duration-200 relative cursor-pointer shadow-md hover:shadow-lg transform hover:-rotate-1 ${
                     selectedNoteId === annotation.id 
                       ? 'border-orange-700' 
-                      : 'border-black'
+                      : 'border-yellow-300'
                   }`}
                   onClick={() => {
                     onAnnotationClick(annotation);
@@ -111,7 +111,7 @@ const Notepad: React.FC<NotepadProps> = ({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button 
-                            className="p-1 hover:bg-gray-100 rounded transition-colors cursor-pointer"
+                            className="p-1 hover:bg-yellow-100 rounded transition-colors cursor-pointer"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <MoreHorizontal className="w-4 h-4 text-gray-500" />
