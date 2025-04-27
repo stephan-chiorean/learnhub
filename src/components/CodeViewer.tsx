@@ -4,7 +4,7 @@ import { useWorkspace } from '../context/WorkspaceContext'
 import SyntaxHighlighter from 'react-syntax-highlighter'
 import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs'
 import AnnotationModal from './AnnotationModal'
-import AnnotationsSidebar from './AnnotationsSidebar'
+import Notepad from './Notepad'
 
 const CodeViewer: React.FC = () => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -24,6 +24,7 @@ const CodeViewer: React.FC = () => {
   const [notes, setNotes] = useState<any[]>([])
   const [snippets, setSnippets] = useState<any[]>([])
   const [hoveredAnnotation, setHoveredAnnotation] = useState<{filePath: string, startLine: number, endLine: number} | null>(null)
+  const [clickedAnnotation, setClickedAnnotation] = useState<{filePath: string, startLine: number, endLine: number} | null>(null)
 
   React.useEffect(() => {
     if (owner && repo && path) {
@@ -83,30 +84,45 @@ const CodeViewer: React.FC = () => {
     }
   }
 
-  const getHighlightedLines = (): { lines: number[]; selectedLines: number[]; hoveredLines: number[] } => {
-    if (!path) return { lines: [], selectedLines: [], hoveredLines: [] }
+  const handleAnnotationClick = (annotation: any) => {
+    setClickedAnnotation({
+      filePath: annotation.filePath,
+      startLine: annotation.startLine,
+      endLine: annotation.endLine
+    });
+    setSelectedAnnotationId(annotation.id);
+  };
+
+  const getHighlightedLines = (): { lines: number[]; selectedLines: number[]; hoveredLines: number[]; clickedLines: number[] } => {
+    if (!path) return { lines: [], selectedLines: [], hoveredLines: [], clickedLines: [] };
     
     // Get all annotations for the current file
-    const fileAnnotations = [...notes, ...snippets].filter(a => a.filePath === path)
-    const highlightedLines = new Set<number>()
+    const fileAnnotations = [...notes, ...snippets].filter(a => a.filePath === path);
+    const highlightedLines = new Set<number>();
     
     // Get the selected annotation
     const selectedAnnotation = selectedAnnotationId 
       ? [...notes, ...snippets].find(a => a.id === selectedAnnotationId)
-      : null
+      : null;
     
     // Add all lines from all annotations to the highlighted set
     fileAnnotations.forEach(annotation => {
       for (let i = annotation.startLine; i <= annotation.endLine; i++) {
-        highlightedLines.add(i)
+        highlightedLines.add(i);
       }
-    })
+    });
     
     // Get hovered lines if they're for the current file
     const hoveredLines = hoveredAnnotation && hoveredAnnotation.filePath === path
       ? Array.from({ length: hoveredAnnotation.endLine - hoveredAnnotation.startLine + 1 }, 
           (_, i) => hoveredAnnotation.startLine + i)
-      : []
+      : [];
+
+    // Get clicked lines if they're for the current file
+    const clickedLines = clickedAnnotation && clickedAnnotation.filePath === path
+      ? Array.from({ length: clickedAnnotation.endLine - clickedAnnotation.startLine + 1 }, 
+          (_, i) => clickedAnnotation.startLine + i)
+      : [];
     
     return {
       lines: Array.from(highlightedLines),
@@ -114,9 +130,10 @@ const CodeViewer: React.FC = () => {
         ? Array.from({ length: selectedAnnotation.endLine - selectedAnnotation.startLine + 1 }, 
             (_, i) => selectedAnnotation.startLine + i)
         : [],
-      hoveredLines
-    }
-  }
+      hoveredLines,
+      clickedLines
+    };
+  };
 
   if (isLoading) {
     return (
@@ -150,7 +167,7 @@ const CodeViewer: React.FC = () => {
   return (
     <div className="flex h-full">
       <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[95%] mx-auto">
           <div className="flex items-center mb-6">
             <button
               onClick={handleBackClick}
@@ -176,51 +193,58 @@ const CodeViewer: React.FC = () => {
               {owner}/{repo}
             </h1>
           </div>
-          <div 
-            className="bg-white rounded-lg shadow p-4"
-            onMouseUp={handleTextSelection}
-            ref={codeRef}
-          >
-            <h2 className="text-lg font-semibold mb-4">{currentFile?.path}</h2>
-            <SyntaxHighlighter
-              language="javascript"
-              style={docco}
-              customStyle={{ margin: 0, padding: '1rem' }}
-              showLineNumbers
-              wrapLines
-              lineProps={(lineNumber) => {
-                const style = { display: 'block' }
-                const { lines, selectedLines, hoveredLines } = getHighlightedLines()
-                
-                if (selectedLines.includes(lineNumber)) {
-                  return {
-                    style: { ...style, backgroundColor: '#fed7aa', color: 'black' }
-                  }
-                } else if (lines.includes(lineNumber)) {
-                  return {
-                    style: { ...style, backgroundColor: '#fff7ed', color: 'black' }
-                  }
-                }
-                return { style }
-              }}
+          <div className="grid grid-cols-[auto_300px] gap-4">
+            <div className="flex items-center">
+              <h2 className="text-lg font-semibold">{currentFile?.path}</h2>
+            </div>
+            <div className="flex items-center">
+              <h3 className="text-2xl font-['Gaegu'] text-orange-700">Notepad</h3>
+            </div>
+          </div>
+          <div className="grid grid-cols-[auto_300px] gap-4 mt-4">
+            <div 
+              className="bg-white rounded-lg shadow p-4"
+              onMouseUp={handleTextSelection}
+              ref={codeRef}
             >
-              {currentFile?.content || ''}
-            </SyntaxHighlighter>
+              <SyntaxHighlighter
+                language="javascript"
+                style={docco}
+                customStyle={{ margin: 0, padding: '1rem' }}
+                showLineNumbers
+                wrapLines
+                lineProps={(lineNumber) => {
+                  const style = { display: 'block' }
+                  const { lines, selectedLines, hoveredLines, clickedLines } = getHighlightedLines()
+                  
+                  if (clickedLines.includes(lineNumber)) {
+                    return {
+                      style: { ...style, backgroundColor: '#fed7aa', color: 'black' }
+                    }
+                  } else if (selectedLines.includes(lineNumber)) {
+                    return {
+                      style: { ...style, backgroundColor: '#fdba74', color: 'black' }
+                    }
+                  } else if (lines.includes(lineNumber)) {
+                    return {
+                      style: { ...style, backgroundColor: '#fff7ed', color: 'black' }
+                    }
+                  }
+                  return { style }
+                }}
+              >
+                {currentFile?.content || ''}
+              </SyntaxHighlighter>
+            </div>
+            <Notepad
+              notes={notes}
+              snippets={snippets}
+              currentFilePath={path || ''}
+              onAnnotationClick={handleAnnotationClick}
+            />
           </div>
         </div>
       </div>
-      <AnnotationsSidebar
-        annotations={notes}
-        snippets={snippets}
-        onRemove={id => {
-          setNotes(notes => notes.filter(n => n.id !== id))
-          setSnippets(snippets => snippets.filter(s => s.id !== id))
-        }}
-        onJumpTo={handleJumpTo}
-        selectedAnnotationId={selectedAnnotationId}
-        onSelectAnnotation={setSelectedAnnotationId}
-        onHighlightLines={handleHighlightLines}
-      />
       <AnnotationModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
