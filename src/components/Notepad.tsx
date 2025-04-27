@@ -43,16 +43,29 @@ const Notepad: React.FC<NotepadProps> = ({
 
   return (
     <div className="relative h-full" ref={containerRef}>
-      <div className="w-full h-full bg-gray-50/50 border-2 border-gray-700 rounded-lg p-4 overflow-hidden">
-        {/* Empty state */}
-        {[...notes, ...snippets].length === 0 && (
-          <div className="absolute top-0 left-0 right-0 p-4">
-            <div className="text-center text-gray-400">
+      {[...notes, ...snippets].length === 0 && (
+        <div className="absolute top-0 left-0 right-0 z-10">
+          <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 mb-4">
+            <div className="text-center text-orange-700">
               <div className="text-2xl mb-2">📝</div>
               <p className="font-['Gaegu'] text-lg">Start by highlighting the code to add to your notepad</p>
             </div>
           </div>
-        )}
+        </div>
+      )}
+      <div 
+        className="w-full h-full border-2 border-gray-700 rounded-lg p-4 overflow-hidden"
+        style={{
+          backgroundImage: `repeating-linear-gradient(
+            to bottom,
+            #f8fafc,
+            #f8fafc ${lineHeight - 1}px,
+            #d1d5db ${lineHeight - 1}px,
+            #d1d5db ${lineHeight}px
+          )`,
+          backgroundSize: `100% ${lineHeight}px`
+        }}
+      >
         {/* Render annotations */}
         {[...notes, ...snippets].map((annotation) => {
           if (annotation.filePath !== currentFilePath) return null;
@@ -66,7 +79,7 @@ const Notepad: React.FC<NotepadProps> = ({
             >
               <div className="w-full px-4">
                 <div 
-                  className={`bg-white border-2 rounded-lg transition-colors duration-200 relative cursor-pointer ${
+                  className={`bg-white/90 border-2 rounded-lg transition-colors duration-200 relative cursor-pointer ${
                     selectedNoteId === annotation.id 
                       ? 'border-orange-700' 
                       : 'border-black'
