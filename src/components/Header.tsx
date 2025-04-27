@@ -1,6 +1,10 @@
-import React from 'react';
+import React from 'react'
 
-const Header = ({ onMenuClick }) => {
+interface HeaderProps {
+  onMenuClick: () => void
+}
+
+const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 flex items-center px-4 z-10 shadow-sm">
       <div 
@@ -48,7 +52,7 @@ const Header = ({ onMenuClick }) => {
         </div>
       </div>
     </header>
-  );
-};
+  )
+}
 
-export default Header; 
+export default Header 

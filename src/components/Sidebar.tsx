@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 
-const RepoItem = ({ name, items }) => {
+interface RepoItemProps {
+  name: string;
+  items: Array<{
+    name: string;
+    iconPath: string;
+  }>;
+}
+
+const RepoItem: React.FC<RepoItemProps> = ({ name, items }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -39,7 +47,11 @@ const RepoItem = ({ name, items }) => {
   );
 };
 
-const Sidebar = ({ isOpen }) => {
+interface SidebarProps {
+  isOpen: boolean;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
   const repositories = [
     {
       name: 'react-beautiful-dnd',

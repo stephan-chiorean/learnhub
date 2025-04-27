@@ -1,8 +1,12 @@
-import React from 'react';
+import React from 'react'
 
-const MainContent = ({ isSidebarOpen }) => {
+interface MainContentProps {
+  isSidebarOpen: boolean
+}
+
+const MainContent: React.FC<MainContentProps> = ({ isSidebarOpen }) => {
   return (
-    <main className={`pt-14 min-h-screen bg-gray-50 flex flex-col items-center justify-center ${isSidebarOpen ? 'ml-64' : 'ml-0'} transition-all duration-300 ease-in-out w-full`}>
+    <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : ''} pt-14 min-h-screen bg-gray-50 flex flex-col items-center justify-center w-full`}>
       <div className="flex flex-col items-center justify-center w-full max-w-4xl px-4">
         {/* Walkthrough Logo */}
         <div className="mb-10 flex items-center">
@@ -39,7 +43,7 @@ const MainContent = ({ isSidebarOpen }) => {
         </div>
       </div>
     </main>
-  );
-};
+  )
+}
 
-export default MainContent; 
+export default MainContent 
