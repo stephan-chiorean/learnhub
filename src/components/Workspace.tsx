@@ -1,26 +1,131 @@
-import React, { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import React, { useEffect, useState, useCallback } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useWorkspace } from '../context/WorkspaceContext'
-import SyntaxHighlighter from 'react-syntax-highlighter'
-import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs'
+import ReactFlow, {
+  Node,
+  Edge,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  Position,
+  NodeTypes,
+} from 'reactflow'
+import 'reactflow/dist/style.css'
 
 interface WorkspaceProps {
   isSidebarOpen: boolean
 }
 
+interface FileNodeData {
+  label: string
+  type: 'file' | 'directory'
+  path: string
+}
+
+const FileNode: React.FC<{ data: FileNodeData }> = ({ data }) => {
+  return (
+    <div className={`px-4 py-2 rounded-lg shadow-sm border ${
+      data.type === 'directory' 
+        ? 'bg-orange-50 border-orange-200' 
+        : 'bg-white border-gray-200'
+    }`}>
+      <div className="flex items-center">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className={`h-4 w-4 mr-2 ${
+            data.type === 'directory' ? 'text-orange-500' : 'text-gray-500'
+          }`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          {data.type === 'directory' ? (
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+            />
+          ) : (
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          )}
+        </svg>
+        <span className="text-sm font-medium">{data.label}</span>
+      </div>
+    </div>
+  )
+}
+
+const nodeTypes: NodeTypes = {
+  fileNode: FileNode,
+}
+
 const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
+  const navigate = useNavigate()
   const {
     directoryTree,
-    currentFile,
     isLoading,
     error,
     fetchDirectoryTree,
-    fetchFileContent
   } = useWorkspace()
 
-  const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [hasFetched, setHasFetched] = useState(false)
+  const [nodes, setNodes, onNodesChange] = useNodesState([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+
+  const processTreeToNodes = useCallback((items: any[], parentId: string | null = null, level: number = 0) => {
+    const newNodes: Node[] = []
+    const newEdges: Edge[] = []
+    let xOffset = 0
+
+    items.forEach((item, index) => {
+      const nodeId = item.path
+      const isDirectory = item.type === 'tree'
+      const node: Node = {
+        id: nodeId,
+        type: 'fileNode',
+        position: { x: level * 250, y: index * 100 },
+        data: {
+          label: item.path.split('/').pop(),
+          type: isDirectory ? 'directory' : 'file',
+          path: item.path,
+        },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+      }
+
+      newNodes.push(node)
+
+      if (parentId) {
+        newEdges.push({
+          id: `${parentId}-${nodeId}`,
+          source: parentId,
+          target: nodeId,
+          type: 'smoothstep',
+          animated: isDirectory,
+        })
+      }
+
+      if (item.children) {
+        const { nodes: childNodes, edges: childEdges } = processTreeToNodes(
+          item.children,
+          nodeId,
+          level + 1
+        )
+        newNodes.push(...childNodes)
+        newEdges.push(...childEdges)
+      }
+    })
+
+    return { nodes: newNodes, edges: newEdges }
+  }, [])
 
   useEffect(() => {
     if (owner && repo && !hasFetched) {
@@ -29,35 +134,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
     }
   }, [owner, repo, fetchDirectoryTree, hasFetched])
 
-  const handleFileClick = (path: string) => {
-    if (owner && repo) {
-      setSelectedPath(path)
-      fetchFileContent(owner, repo, path)
+  useEffect(() => {
+    if (directoryTree.length > 0) {
+      const { nodes: newNodes, edges: newEdges } = processTreeToNodes(directoryTree)
+      setNodes(newNodes)
+      setEdges(newEdges)
     }
-  }
+  }, [directoryTree, processTreeToNodes, setNodes, setEdges])
 
-  const renderFileTree = (items: any[]) => {
-    return (
-      <ul className="space-y-1">
-        {items.map((item) => (
-          <li key={item.path}>
-            {item.type === 'tree' ? (
-              <div className="font-semibold text-gray-700">{item.path.split('/').pop()}</div>
-            ) : (
-              <button
-                onClick={() => handleFileClick(item.path)}
-                className={`text-sm hover:text-blue-600 ${
-                  selectedPath === item.path ? 'text-blue-600 font-medium' : 'text-gray-600'
-                }`}
-              >
-                {item.path.split('/').pop()}
-              </button>
-            )}
-            {item.children && renderFileTree(item.children)}
-          </li>
-        ))}
-      </ul>
-    )
+  const onNodeClick = (event: React.MouseEvent, node: Node) => {
+    const data = node.data as FileNodeData
+    if (data.type === 'file' && owner && repo) {
+      navigate(`/workspace/${owner}/${repo}/file?path=${encodeURIComponent(data.path)}`)
+    }
   }
 
   if (isLoading) {
@@ -95,29 +184,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
         <h1 className="text-2xl font-bold mb-4">
           {owner}/{repo}
         </h1>
-        <div className="grid grid-cols-4 gap-6">
-          <div className="col-span-1 bg-white rounded-lg shadow p-4 overflow-auto">
-            <h2 className="text-lg font-semibold mb-4">Files</h2>
-            {renderFileTree(directoryTree)}
-          </div>
-          <div className="col-span-3 bg-white rounded-lg shadow p-4 overflow-auto">
-            {currentFile ? (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">{currentFile.path}</h2>
-                <SyntaxHighlighter
-                  language="javascript"
-                  style={docco}
-                  customStyle={{ margin: 0, padding: '1rem' }}
-                >
-                  {currentFile.content}
-                </SyntaxHighlighter>
-              </div>
-            ) : (
-              <div className="text-gray-500 text-center py-8">
-                Select a file to view its content
-              </div>
-            )}
-          </div>
+        <div className="bg-white rounded-lg shadow p-4" style={{ height: 'calc(100vh - 8rem)' }}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeClick={onNodeClick}
+            nodeTypes={nodeTypes}
+            fitView
+          >
+            <Background />
+            <Controls />
+          </ReactFlow>
         </div>
       </div>
     </div>

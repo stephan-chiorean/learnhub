@@ -4,6 +4,7 @@ import Header from './components/Header'
 import Sidebar from './components/Sidebar'
 import MainContent from './components/MainContent'
 import Workspace from './components/Workspace'
+import CodeViewer from './components/CodeViewer'
 import useSidebar from './hooks/useSidebar'
 import { WorkspaceProvider } from './context/WorkspaceContext'
 
@@ -20,6 +21,7 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<MainContent isSidebarOpen={isSidebarOpen} />} />
               <Route path="/workspace/:owner/:repo" element={<Workspace isSidebarOpen={isSidebarOpen} />} />
+              <Route path="/workspace/:owner/:repo/file" element={<CodeViewer />} />
             </Routes>
           </div>
         </div>
