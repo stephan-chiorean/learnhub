@@ -18,6 +18,7 @@ interface AISummaryModalProps {
   onOpenChange: (open: boolean) => void
   summary: SummaryJSON | string
   onAddNote?: () => void
+  isGenerating?: boolean
 }
 
 const fontClass = "font-['Gaegu'] text-lg text-gray-700";
@@ -26,7 +27,8 @@ const AISummaryModal: React.FC<AISummaryModalProps> = ({
   isOpen,
   onOpenChange,
   summary,
-  onAddNote
+  onAddNote,
+  isGenerating = false
 }) => {
   // If summary is a string (e.g., loading or error), just show it
   if (typeof summary === 'string') {
@@ -52,7 +54,12 @@ const AISummaryModal: React.FC<AISummaryModalProps> = ({
             {onAddNote && (
               <button
                 onClick={onAddNote}
-                className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg"
+                disabled={isGenerating}
+                className={`px-6 py-2 rounded-lg transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg ${
+                  isGenerating
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-orange-500 text-white hover:bg-orange-600'
+                }`}
               >
                 Add Note
               </button>
@@ -106,7 +113,12 @@ const AISummaryModal: React.FC<AISummaryModalProps> = ({
           {onAddNote && (
             <button
               onClick={onAddNote}
-              className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg"
+              disabled={isGenerating}
+              className={`px-6 py-2 rounded-lg transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg ${
+                isGenerating
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-orange-500 text-white hover:bg-orange-600'
+              }`}
             >
               Add Note
             </button>

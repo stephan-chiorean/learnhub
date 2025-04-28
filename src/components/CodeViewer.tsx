@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useWorkspace } from '../context/WorkspaceContext'
 import SyntaxHighlighter from 'react-syntax-highlighter'
@@ -34,6 +34,8 @@ const CodeViewer: React.FC = () => {
   const [isAISummaryOpen, setIsAISummaryOpen] = useState(false)
   const [isCopying, setIsCopying] = useState(false)
   const [aiSummary, setAISummary] = useState<string | SummaryJSON>('')
+  const [loadingDots, setLoadingDots] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
 
   interface SummaryJSON {
     title: string
@@ -44,6 +46,22 @@ const CodeViewer: React.FC = () => {
     }[]
     overallStructure: string
   }
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (typeof aiSummary === 'string' && aiSummary.startsWith('Generating summary')) {
+      interval = setInterval(() => {
+        setLoadingDots(prev => {
+          const newDots = prev.length >= 3 ? '' : prev + '.';
+          setAISummary('Generating summary' + newDots);
+          return newDots;
+        });
+      }, 200);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [aiSummary]);
 
   React.useEffect(() => {
     if (owner && repo && path) {
@@ -195,7 +213,9 @@ const CodeViewer: React.FC = () => {
   const handleAISummary = async () => {
     if (!currentFile?.content) return;
     setIsAISummaryOpen(true);
-    setAISummary('Generating summary...');
+    setLoadingDots('');
+    setAISummary('Generating summary');
+    setIsGenerating(true);
 
     try {
       const response = await fetch('http://localhost:3001/api/generateSummary', {
@@ -224,6 +244,8 @@ const CodeViewer: React.FC = () => {
     } catch (error) {
       console.error('Error generating summary:', error);
       setAISummary('Failed to generate summary. Please try again.');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -429,6 +451,7 @@ const CodeViewer: React.FC = () => {
         onOpenChange={setIsAISummaryOpen}
         summary={aiSummary}
         onAddNote={handleAddSummaryNote}
+        isGenerating={isGenerating}
       />
     </div>
   )

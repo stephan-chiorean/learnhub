@@ -99,17 +99,57 @@ const Notepad: React.FC<NotepadProps> = ({
                       <div className="text-lg font-['Gaegu'] text-gray-700 leading-tight">
                         {annotation.content}
                       </div>
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
                       {annotation.tags && annotation.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
+                        <div className="flex flex-wrap gap-1">
                           {annotation.tags.map((tag: string) => (
                             <span
                               key={tag}
-                              className="bg-orange-100 text-orange-800 border border-orange-200 text-xs px-2 py-0.5 rounded"
+                              className={`text-xs px-2 py-0.5 rounded ${
+                                annotation.isSummary
+                                  ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                                  : 'bg-orange-50 text-orange-700 border border-orange-200'
+                              }`}
                             >
                               {tag}
                             </span>
                           ))}
                         </div>
+                      )}
+                      {!annotation.isSummary && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button 
+                              className="p-1 hover:bg-yellow-100 rounded transition-colors cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="w-4 h-4 text-gray-500" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditNote(annotation);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteNote(annotation);
+                              }}
+                              className="text-red-600 cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
                   </div>
@@ -151,8 +191,10 @@ const Notepad: React.FC<NotepadProps> = ({
                       <div className="text-lg font-['Gaegu'] text-gray-700 leading-tight">
                         {annotation.content}
                       </div>
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
                       {annotation.tags && annotation.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
+                        <div className="flex flex-wrap gap-1">
                           {annotation.tags.map((tag: string) => (
                             <span
                               key={tag}
@@ -167,9 +209,7 @@ const Notepad: React.FC<NotepadProps> = ({
                           ))}
                         </div>
                       )}
-                    </div>
-                    {!annotation.isSummary && (
-                      <div className="flex justify-end">
+                      {!annotation.isSummary && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button 
@@ -202,8 +242,8 @@ const Notepad: React.FC<NotepadProps> = ({
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
