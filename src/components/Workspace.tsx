@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useWorkspace } from '../context/WorkspaceContext'
 import ReactFlow, {
@@ -79,10 +79,28 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const { directoryTree, isLoading, error, fetchDirectoryTree } = useWorkspace()
   const [workspaceAlias, setWorkspaceAlias] = useState(`${owner}/${repo}`)
   const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false)
-
   const [hasFetched, setHasFetched] = useState(false)
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node[]>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge[]>([])
+
+  // Use Maps for efficient node and edge management
+  const [nodeMap, setNodeMap] = useState<Map<string, Node>>(new Map())
+  const [edgeMap, setEdgeMap] = useState<Map<string, Edge>>(new Map())
+
+  // Convert Maps to arrays for ReactFlow
+  const nodes = useMemo(() => Array.from(nodeMap.values()), [nodeMap])
+  const edges = useMemo(() => Array.from(edgeMap.values()), [edgeMap])
+
+  // Initialize ReactFlow state with our nodes and edges
+  const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState(nodes)
+  const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState(edges)
+
+  // Update ReactFlow state when our nodes or edges change
+  useEffect(() => {
+    setReactFlowNodes(nodes)
+  }, [nodes, setReactFlowNodes])
+
+  useEffect(() => {
+    setReactFlowEdges(edges)
+  }, [edges, setReactFlowEdges])
 
   useEffect(() => {
     if (owner && repo && !hasFetched) {
@@ -92,20 +110,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
     }
   }, [owner, repo, fetchDirectoryTree, hasFetched])
 
-  useEffect(() => {
-    if (directoryTree && directoryTree.length > 0) {
-      console.log('Processing directory tree:', directoryTree)
-      const { nodes: newNodes, edges: newEdges } = processTree(directoryTree)
-      console.log('Generated nodes:', newNodes)
-      console.log('Generated edges:', newEdges)
-      setNodes(newNodes)
-      setEdges(newEdges)
-    }
-  }, [directoryTree])
-
-  const createNode = (item: any, parentId: string | null, index: number, level: number = 0): Node => {
-    const x = level * 300;
-    const y = index * 100 + (level * 20);
+  const createNode = useCallback((item: any, parentId: string | null, index: number, level: number = 0): Node => {
+    const x = level * 300
+    const y = index * 100 + (level * 20)
 
     return {
       id: item.path,
@@ -125,89 +132,88 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
         width: 200,
         height: 40,
       },
-    };
-  }
+    }
+  }, [])
 
-  const processTree = (items: any[], parentId: string | null = null, level: number = 0): { nodes: Node[], edges: Edge[] } => {
-    let nodes: Node[] = [];
-    let edges: Edge[] = [];
+  // Initialize root nodes when directory tree is loaded
+  useEffect(() => {
+    if (directoryTree && directoryTree.length > 0) {
+      const newNodes = new Map<string, Node>()
+      const newEdges = new Map<string, Edge>()
 
-    items.forEach((item, index) => {
-      const node = createNode(item, parentId, index, level);
-      nodes.push(node);
+      // Only create root-level nodes initially
+      directoryTree.forEach((item, index) => {
+        const node = createNode(item, null, index)
+        newNodes.set(node.id, node)
+      })
 
-      if (parentId) {
-        edges.push({
-          id: `${parentId}-${node.id}`,
-          source: parentId,
-          target: node.id,
-          sourceHandle: 'source',
-          targetHandle: 'target',
-          type: 'smoothstep',
-          animated: true,
-          style: { stroke: '#94a3b8' },
-        });
-      }
+      setNodeMap(newNodes)
+      setEdgeMap(newEdges)
+    }
+  }, [directoryTree, createNode])
 
-      if (item.type === 'tree' && item.children && item.children.length > 0) {
-        const { nodes: childNodes, edges: childEdges } = processTree(item.children, node.id, level + 1);
-        nodes = [...nodes, ...childNodes];
-        edges = [...edges, ...childEdges];
-      }
-    });
-
-    return { nodes, edges };
-  }
-
-  const toggleFolder = (node: Node) => {
+  const toggleFolder = useCallback((node: Node) => {
     const fileData = node.data as FileNodeData
     if (!fileData.children) return
 
     const alreadyExpanded = fileData.isExpanded
 
     if (alreadyExpanded) {
-      // collapse -> remove all children nodes recursively
-      const descendantIds = getAllDescendants(node.id)
-      setNodes((nds) => nds.filter((n) => !descendantIds.includes(n.id)))
-      setEdges((eds) => eds.filter((e) => !descendantIds.includes(e.source) && !descendantIds.includes(e.target)))
-      updateNodeData(node.id, { isExpanded: false })
-    } else {
-      // expand -> add children nodes
-      const childrenNodes = (fileData.children || []).map((child, index) => createNode(child, node.id, index, node.position.x / 300 + 1))
-      const childrenEdges = childrenNodes.map((child) => ({
-        id: `${node.id}-${child.id}`,
-        source: node.id,
-        target: child.id,
-        type: 'smoothstep',
-      }))
-      setNodes((nds) => [...nds, ...childrenNodes])
-      setEdges((eds) => [...eds, ...childrenEdges])
-      updateNodeData(node.id, { isExpanded: true })
-    }
-  }
+      // Collapse folder - remove all descendants
+      const newNodes = new Map(nodeMap)
+      const newEdges = new Map(edgeMap)
+      
+      // Efficiently remove all descendants
+      const removeDescendants = (parentId: string) => {
+        const children = Array.from(newNodes.values()).filter(n => n.parentNode === parentId)
+        children.forEach(child => {
+          newNodes.delete(child.id)
+          newEdges.delete(`${parentId}-${child.id}`)
+          if ((child.data as FileNodeData).type === 'directory') {
+            removeDescendants(child.id)
+          }
+        })
+      }
 
-  const getAllDescendants = (parentId: string): string[] => {
-    const descendants: string[] = []
-    const stack = [parentId]
-
-    while (stack.length > 0) {
-      const currentId = stack.pop()!
-      nodes.forEach((node) => {
-        if (node.parentNode === currentId) {
-          descendants.push(node.id)
-          stack.push(node.id)
-        }
+      removeDescendants(node.id)
+      newNodes.set(node.id, {
+        ...node,
+        data: { ...fileData, isExpanded: false }
       })
+
+      setNodeMap(newNodes)
+      setEdgeMap(newEdges)
+    } else {
+      // Expand folder - add children
+      const newNodes = new Map(nodeMap)
+      const newEdges = new Map(edgeMap)
+
+      // Add children nodes and edges
+      fileData.children.forEach((child, index) => {
+        const childNode = createNode(child, node.id, index, node.position.x / 300 + 1)
+        newNodes.set(childNode.id, childNode)
+        newEdges.set(`${node.id}-${childNode.id}`, {
+          id: `${node.id}-${childNode.id}`,
+          source: node.id,
+          target: childNode.id,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: '#94a3b8' },
+        })
+      })
+
+      // Update parent node's expanded state
+      newNodes.set(node.id, {
+        ...node,
+        data: { ...fileData, isExpanded: true }
+      })
+
+      setNodeMap(newNodes)
+      setEdgeMap(newEdges)
     }
+  }, [nodeMap, edgeMap, createNode])
 
-    return descendants
-  }
-
-  const updateNodeData = (nodeId: string, newData: Partial<FileNodeData>) => {
-    setNodes((nds) => nds.map((node) => node.id === nodeId ? { ...node, data: { ...node.data, ...newData } } : node))
-  }
-
-  const onNodeClick = (event: React.MouseEvent, node: Node) => {
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.stopPropagation()
     const data = node.data as FileNodeData
 
@@ -216,7 +222,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
     } else if (data.type === 'file' && owner && repo) {
       navigate(`/workspace/${owner}/${repo}/file?path=${encodeURIComponent(data.path)}`)
     }
-  }
+  }, [toggleFolder, owner, repo, navigate])
 
   if (isLoading) {
     return <div className={`flex-1 overflow-auto ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>Loading...</div>
@@ -250,8 +256,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
               <SiOpenai className="w-5 h-5" />
             </button>
             <ReactFlow
-              nodes={nodes}
-              edges={edges}
+              nodes={reactFlowNodes}
+              edges={reactFlowEdges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onNodeClick={onNodeClick}
