@@ -243,20 +243,20 @@ app.post('/api/generateSummary', async (req: Request, res: Response) => {
         {
           role: "system",
           content: `
-You are a professional technical writer. Your job is to analyze code and return a JSON summary with the following structure:
-{
-  "title": string, // A concise title for the code
-  "mainPurpose": string, // One paragraph summarizing the code's primary goal
-  "keyComponents": [
-    {"name": string, "description": string}, // Each key component and a short description
-    ...
-  ],
-  "overallStructure": string // One paragraph summarizing the overall flow and organization
-}
-- Do NOT include any Markdown or code fences in your response.
-- Only output valid JSON, nothing else.
-- Do not add explanations or extra text.
-- Use plain English, not Markdown.
+            You are a professional technical writer. Your job is to analyze code and return a JSON summary with the following structure:
+            {
+              "title": string, // A concise title for the code
+              "mainPurpose": string, // One paragraph summarizing the code's primary goal
+              "keyComponents": [
+                {"name": string, "description": string}, // Each key component and a short description
+                ...
+              ],
+              "overallStructure": string // One paragraph summarizing the overall flow and organization
+            }
+            - Do NOT include any Markdown or code fences in your response.
+            - Only output valid JSON, nothing else.
+            - Do not add explanations or extra text.
+            - Use plain English, not Markdown.
           `.trim()
         },
         {

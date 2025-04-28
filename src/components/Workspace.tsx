@@ -12,6 +12,7 @@ import ReactFlow, {
   NodeTypes,
   Handle,
 } from 'reactflow'
+import { SiOpenai } from 'react-icons/si'
 import 'reactflow/dist/style.css'
 
 interface WorkspaceProps {
@@ -75,6 +76,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
   const navigate = useNavigate()
   const { directoryTree, isLoading, error, fetchDirectoryTree } = useWorkspace()
+  const [workspaceAlias, setWorkspaceAlias] = useState(`${owner}/${repo}`)
 
   const [hasFetched, setHasFetched] = useState(false)
   const [nodes, setNodes, onNodesChange] = useNodesState<Node[]>([])
@@ -215,37 +217,56 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   }
 
   if (isLoading) {
-    return <div className={`flex-1 overflow-auto p-6 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>Loading...</div>
+    return <div className={`flex-1 overflow-auto ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>Loading...</div>
   }
 
   if (error) {
-    return <div className={`flex-1 overflow-auto p-6 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>{error}</div>
+    return <div className={`flex-1 overflow-auto ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>{error}</div>
   }
 
   return (
-    <div className={`flex-1 overflow-auto p-6 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
+    <div className={`flex-1 overflow-auto pt-14 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-bold mb-4">{owner}/{repo}</h1>
-        <div className="bg-white rounded-lg shadow p-4" style={{ height: 'calc(100vh - 8rem)' }}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onNodeClick={onNodeClick}
-            nodeTypes={nodeTypes}
-            fitView
-            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-            minZoom={0.1}
-            maxZoom={2}
-            style={{ background: '#f8fafc' }}
-            panOnScroll
-            zoomOnScroll={false}
-            panOnDrag={false}
-          >
-            <Background />
-            <Controls />
-          </ReactFlow>
+        <div className="flex items-center justify-between p-6">
+          <h1 className="text-2xl font-['Gaegu'] text-orange-700">Code Diagram</h1>
+          <input
+            type="text"
+            value={workspaceAlias}
+            onChange={(e) => setWorkspaceAlias(e.target.value)}
+            className="text-lg font-semibold text-gray-700 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-orange-500 focus:outline-none px-2 py-1 transition-colors"
+            placeholder="Workspace alias"
+            size={workspaceAlias.length || 20}
+          />
+        </div>
+        <div className="px-6">
+          <div className="bg-white rounded-lg shadow p-4 relative" style={{ height: 'calc(100vh - 14rem)' }}>
+            <button
+              onClick={() => {/* TODO: Implement walkthrough generation */}}
+              className="absolute top-8 right-8 flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md z-10"
+            >
+              Generate Walkthrough
+              <SiOpenai className="w-5 h-5" />
+            </button>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onNodeClick={onNodeClick}
+              nodeTypes={nodeTypes}
+              fitView
+              defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+              minZoom={0.1}
+              maxZoom={2}
+              style={{ background: '#f8fafc' }}
+              panOnScroll
+              zoomOnScroll={false}
+              panOnDrag={false}
+            >
+              <Background />
+              <Controls />
+            </ReactFlow>
+          </div>
         </div>
       </div>
     </div>
