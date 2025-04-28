@@ -5,10 +5,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 interface Annotation {
   id: string;
   content: string;
+  fullContent?: string;
   startLine: number;
   endLine: number;
   filePath: string;
   tags?: string[];
+  isSummary?: boolean;
 }
 
 interface NotepadProps {
@@ -18,6 +20,7 @@ interface NotepadProps {
   onAnnotationClick: (annotation: Annotation) => void;
   onEditNote: (annotation: Annotation) => void;
   onDeleteNote: (annotation: Annotation) => void;
+  onSummaryClick?: (summary: string) => void;
 }
 
 const Notepad: React.FC<NotepadProps> = ({
@@ -27,6 +30,7 @@ const Notepad: React.FC<NotepadProps> = ({
   onAnnotationClick,
   onEditNote,
   onDeleteNote,
+  onSummaryClick,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [lineHeight, setLineHeight] = useState(24); // Default line height in pixels
@@ -67,8 +71,53 @@ const Notepad: React.FC<NotepadProps> = ({
         }}
       >
         {/* Render annotations */}
-        {[...notes, ...snippets].map((annotation) => {
+        {[...notes, ...snippets].map((annotation, idx) => {
           if (annotation.filePath !== currentFilePath) return null;
+
+          // Special rendering for AI Summary note
+          if (annotation.isSummary) {
+            return (
+              <div
+                key={annotation.id}
+                className="flex justify-center w-full"
+                style={{ position: 'relative', zIndex: 2, marginTop: '2px' }}
+              >
+                <div
+                  className={
+                    'bg-yellow-50 border-2 rounded-lg transition-colors duration-200 relative cursor-pointer shadow-md hover:shadow-lg transform hover:-rotate-1 border-orange-600 max-w-2xl w-full'
+                  }
+                  style={{ margin: '0 auto', paddingTop: 0, left: 0, right: 0 }}
+                  onClick={() => {
+                    if (annotation.fullContent) {
+                      onSummaryClick?.(annotation.fullContent);
+                    }
+                    setSelectedNoteId(annotation.id);
+                  }}
+                >
+                  <div className="flex flex-col gap-2 p-6">
+                    <div className="flex-1">
+                      <div className="text-lg font-['Gaegu'] text-gray-700 leading-tight">
+                        {annotation.content}
+                      </div>
+                      {annotation.tags && annotation.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {annotation.tags.map((tag: string) => (
+                            <span
+                              key={tag}
+                              className="bg-orange-100 text-orange-800 border border-orange-200 text-xs px-2 py-0.5 rounded"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               key={annotation.id}
@@ -81,11 +130,19 @@ const Notepad: React.FC<NotepadProps> = ({
                 <div 
                   className={`bg-yellow-50 border-2 rounded-lg transition-colors duration-200 relative cursor-pointer shadow-md hover:shadow-lg transform hover:-rotate-1 ${
                     selectedNoteId === annotation.id 
-                      ? 'border-orange-700' 
-                      : 'border-yellow-300'
+                      ? annotation.isSummary 
+                        ? 'border-orange-800' 
+                        : 'border-orange-700' 
+                      : annotation.isSummary
+                        ? 'border-orange-600'
+                        : 'border-yellow-300'
                   }`}
                   onClick={() => {
-                    onAnnotationClick(annotation);
+                    if (annotation.isSummary && annotation.fullContent) {
+                      onSummaryClick?.(annotation.fullContent);
+                    } else {
+                      onAnnotationClick(annotation);
+                    }
                     setSelectedNoteId(annotation.id);
                   }}
                 >
@@ -99,7 +156,11 @@ const Notepad: React.FC<NotepadProps> = ({
                           {annotation.tags.map((tag: string) => (
                             <span
                               key={tag}
-                              className="bg-orange-50 text-orange-700 border border-orange-200 text-xs px-2 py-0.5 rounded"
+                              className={`text-xs px-2 py-0.5 rounded ${
+                                annotation.isSummary
+                                  ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                                  : 'bg-orange-50 text-orange-700 border border-orange-200'
+                              }`}
                             >
                               {tag}
                             </span>
@@ -107,40 +168,42 @@ const Notepad: React.FC<NotepadProps> = ({
                         </div>
                       )}
                     </div>
-                    <div className="flex justify-end">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button 
-                            className="p-1 hover:bg-yellow-100 rounded transition-colors cursor-pointer"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreHorizontal className="w-4 h-4 text-gray-500" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEditNote(annotation);
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <Pencil className="w-4 h-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteNote(annotation);
-                            }}
-                            className="text-red-600 cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                    {!annotation.isSummary && (
+                      <div className="flex justify-end">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button 
+                              className="p-1 hover:bg-yellow-100 rounded transition-colors cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="w-4 h-4 text-gray-500" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditNote(annotation);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteNote(annotation);
+                              }}
+                              className="text-red-600 cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

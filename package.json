@@ -25,6 +25,7 @@
     "clsx": "^2.1.1",
     "dotenv": "^16.5.0",
     "lucide-react": "^0.503.0",
+    "openai": "^4.96.0",
     "post-it-react": "^1.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

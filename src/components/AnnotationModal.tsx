@@ -178,16 +178,19 @@ const AnnotationModal: React.FC<AnnotationModalProps> = ({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} className="border-gray-200 hover:bg-gray-50">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg"
+          >
             Cancel
-          </Button>
-          <Button
+          </button>
+          <button
             onClick={handleSave}
-            className="bg-orange-500 hover:bg-orange-600 text-white"
+            className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg"
             disabled={!noteContent.trim()}
           >
-            {editingNote ? 'Update' : 'Save'}
-          </Button>
+            Add Note
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

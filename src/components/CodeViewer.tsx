@@ -9,6 +9,7 @@ import { Copy, Check } from 'lucide-react'
 import { SiOpenai } from 'react-icons/si'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
+import AISummaryModal from './AISummaryModal'
 
 const CodeViewer: React.FC = () => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -32,7 +33,17 @@ const CodeViewer: React.FC = () => {
   const [clickedAnnotation, setClickedAnnotation] = useState<{filePath: string, startLine: number, endLine: number} | null>(null)
   const [isAISummaryOpen, setIsAISummaryOpen] = useState(false)
   const [isCopying, setIsCopying] = useState(false)
-  const [aiSummary, setAISummary] = useState('')
+  const [aiSummary, setAISummary] = useState<string | SummaryJSON>('')
+
+  interface SummaryJSON {
+    title: string
+    mainPurpose: string
+    keyComponents: {
+      name: string
+      description: string
+    }[]
+    overallStructure: string
+  }
 
   React.useEffect(() => {
     if (owner && repo && path) {
@@ -182,11 +193,83 @@ const CodeViewer: React.FC = () => {
   }
 
   const handleAISummary = async () => {
-    if (!currentFile?.content) return
-    setIsAISummaryOpen(true)
-    // TODO: Implement actual AI summary generation
-    setAISummary('Generating summary...')
-  }
+    if (!currentFile?.content) return;
+    setIsAISummaryOpen(true);
+    setAISummary('Generating summary...');
+
+    try {
+      const response = await fetch('http://localhost:3001/api/generateSummary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: currentFile.content
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate summary');
+      }
+
+      const data = await response.json();
+      // Ensure we're setting the summary correctly
+      if (typeof data.summary === 'string') {
+        setAISummary(data.summary);
+      } else if (data.summary && typeof data.summary === 'object') {
+        setAISummary(data.summary);
+      } else {
+        throw new Error('Invalid summary format received');
+      }
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      setAISummary('Failed to generate summary. Please try again.');
+    }
+  };
+
+  const handleAddSummaryNote = () => {
+    let noteContent = '';
+    let fullContent = '';
+    
+    if (typeof aiSummary === 'string') {
+      noteContent = aiSummary;
+      fullContent = aiSummary;
+    } else if (aiSummary && typeof aiSummary === 'object') {
+      // For the note display, only show the main purpose
+      noteContent = aiSummary.mainPurpose;
+      // Store the full structured content
+      fullContent = JSON.stringify(aiSummary);
+    } else {
+      console.error('Invalid summary format');
+      return;
+    }
+
+    const newNote = {
+      id: `${Date.now()}-note`,
+      content: noteContent,
+      fullContent: fullContent,
+      startLine: -1, // Special value to prevent highlighting
+      endLine: -1,   // Special value to prevent highlighting
+      filePath: path || '',
+      tags: ['AI Summary'],
+      isSummary: true
+    };
+
+    setNotes(prev => [newNote, ...prev]);
+    setIsAISummaryOpen(false);
+  };
+
+  const handleSummaryClick = (summary: string) => {
+    try {
+      const parsedSummary = JSON.parse(summary);
+      setAISummary(parsedSummary);
+      setIsAISummaryOpen(true);
+    } catch (e) {
+      // If it's not JSON, it's a string summary
+      setAISummary(summary);
+      setIsAISummaryOpen(true);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -248,7 +331,7 @@ const CodeViewer: React.FC = () => {
               </h1>
             </div>
           </div>
-          <div className="grid grid-cols-[auto_300px] gap-4">
+          <div className="grid grid-cols-[auto_400px] gap-4">
             <div className="flex items-center">
               <h2 className="text-lg font-semibold">{currentFile?.path}</h2>
             </div>
@@ -256,7 +339,7 @@ const CodeViewer: React.FC = () => {
               <h3 className="text-2xl font-['Gaegu'] text-orange-700">Notepad</h3>
             </div>
           </div>
-          <div className="grid grid-cols-[auto_300px] gap-4 mt-4">
+          <div className="grid grid-cols-[auto_400px] gap-4 mt-4">
             <div 
               className="bg-white rounded-lg shadow p-4 relative"
               onMouseUp={handleTextSelection}
@@ -326,6 +409,7 @@ const CodeViewer: React.FC = () => {
               onAnnotationClick={handleAnnotationClick}
               onEditNote={handleEditNote}
               onDeleteNote={handleDeleteNote}
+              onSummaryClick={handleSummaryClick}
             />
           </div>
         </div>
@@ -340,19 +424,12 @@ const CodeViewer: React.FC = () => {
         selection={selection}
         editingNote={editingNote}
       />
-      <Dialog open={isAISummaryOpen} onOpenChange={setIsAISummaryOpen}>
-        <DialogContent className="sm:max-w-[1200px] bg-white border-orange-200">
-          <DialogHeader>
-            <DialogTitle className="text-orange-600 flex items-center gap-2">
-              <SiOpenai className="w-5 h-5" />
-              AI Summary
-            </DialogTitle>
-          </DialogHeader>
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-gray-700 font-['Gaegu'] text-lg leading-tight">{aiSummary}</p>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AISummaryModal
+        isOpen={isAISummaryOpen}
+        onOpenChange={setIsAISummaryOpen}
+        summary={aiSummary}
+        onAddNote={handleAddSummaryNote}
+      />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import axios, { AxiosError } from 'axios';
 import dotenv from 'dotenv';
+import OpenAI from 'openai';
 
 dotenv.config({ path: '../.env' });
 
@@ -134,6 +135,10 @@ const buildNestedTree = (items: TreeItem[]): TreeNode[] => {
   return tree;
 };
 
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 // POST /api/createWorkspace
 app.post('/api/createWorkspace', async (req: Request, res: Response) => {
   try {
@@ -220,6 +225,71 @@ app.get('/api/fileContent', async (req: Request, res: Response) => {
   } catch (error) {
     const { status, message } = handleGitHubError(error as AxiosError);
     res.status(status).json({ error: message });
+  }
+});
+
+// POST /api/generateSummary
+app.post('/api/generateSummary', async (req: Request, res: Response) => {
+  try {
+    const { code } = req.body;
+
+    if (!code || typeof code !== 'string' || code.trim().length === 0) {
+      return res.status(400).json({ error: 'Valid code content is required' });
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `
+You are a professional technical writer. Your job is to analyze code and return a JSON summary with the following structure:
+{
+  "title": string, // A concise title for the code
+  "mainPurpose": string, // One paragraph summarizing the code's primary goal
+  "keyComponents": [
+    {"name": string, "description": string}, // Each key component and a short description
+    ...
+  ],
+  "overallStructure": string // One paragraph summarizing the overall flow and organization
+}
+- Do NOT include any Markdown or code fences in your response.
+- Only output valid JSON, nothing else.
+- Do not add explanations or extra text.
+- Use plain English, not Markdown.
+          `.trim()
+        },
+        {
+          role: "user",
+          content: `Summarize this code as JSON:\n\n${code}`
+        }
+      ],
+      temperature: 0.2,
+      max_tokens: 800,
+    });
+
+    let summaryJson = completion.choices[0]?.message?.content?.trim();
+    if (!summaryJson) {
+      return res.status(500).json({ error: 'Failed to generate summary' });
+    }
+
+    // Try to parse the JSON
+    try {
+      summaryJson = JSON.parse(summaryJson);
+    } catch (e) {
+      // Try to fix common issues (e.g., code block wrappers)
+      summaryJson = (summaryJson || '').replace(/^[^\{]*({[\s\S]*})[^\}]*$/m, '$1');
+      try {
+        summaryJson = JSON.parse(summaryJson);
+      } catch (e2) {
+        return res.status(500).json({ error: 'Failed to parse summary JSON', raw: completion.choices[0]?.message?.content });
+      }
+    }
+
+    res.json({ summary: summaryJson });
+  } catch (error) {
+    console.error('Error generating summary:', error);
+    res.status(500).json({ error: 'Failed to generate summary' });
   }
 });
 
