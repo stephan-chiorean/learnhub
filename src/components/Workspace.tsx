@@ -12,7 +12,8 @@ import ReactFlow, {
   NodeTypes,
   Handle,
 } from 'reactflow'
-import { SiOpenai } from 'react-icons/si'
+import { SiOpenai, SiPython, SiDocker, SiYaml, SiJavascript, SiTypescript, SiJson, SiMarkdown, SiHtml5, SiCss3 } from 'react-icons/si'
+import { FaFileCode, FaFileAlt } from 'react-icons/fa'
 import 'reactflow/dist/style.css'
 import WalkthroughModal from './WalkthroughModal'
 
@@ -28,6 +29,66 @@ interface FileNodeData {
   children?: any[]
 }
 
+const getFileIcon = (fileName: string) => {
+  const extension = fileName.split('.').pop()?.toLowerCase()
+  
+  switch (extension) {
+    case 'py':
+      return <SiPython className="w-4 h-4 text-blue-600" />
+    case 'js':
+      return <SiJavascript className="w-4 h-4 text-yellow-500" />
+    case 'ts':
+      return <SiTypescript className="w-4 h-4 text-blue-600" />
+    case 'yaml':
+    case 'yml':
+      return <SiYaml className="w-4 h-4 text-red-500" />
+    case 'dockerfile':
+    case 'docker-compose.yml':
+      return <SiDocker className="w-4 h-4 text-blue-500" />
+    case 'json':
+      return <SiJson className="w-4 h-4 text-yellow-600" />
+    case 'md':
+    case 'markdown':
+      return <SiMarkdown className="w-4 h-4 text-gray-600" />
+    case 'html':
+      return <SiHtml5 className="w-4 h-4 text-orange-500" />
+    case 'css':
+      return <SiCss3 className="w-4 h-4 text-blue-500" />
+    default:
+      return <FaFileCode className="w-4 h-4 text-gray-500" />
+  }
+}
+
+const getFileColor = (fileName: string) => {
+  const extension = fileName.split('.').pop()?.toLowerCase()
+  
+  switch (extension) {
+    case 'py':
+      return 'text-blue-600'
+    case 'js':
+      return 'text-yellow-500'
+    case 'ts':
+      return 'text-blue-600'
+    case 'yaml':
+    case 'yml':
+      return 'text-red-500'
+    case 'dockerfile':
+    case 'docker-compose.yml':
+      return 'text-blue-500'
+    case 'json':
+      return 'text-yellow-600'
+    case 'md':
+    case 'markdown':
+      return 'text-gray-600'
+    case 'html':
+      return 'text-orange-500'
+    case 'css':
+      return 'text-blue-500'
+    default:
+      return 'text-gray-500'
+  }
+}
+
 const FileNode: React.FC<{ data: FileNodeData }> = ({ data }) => {
   return (
     <div className={`px-4 py-2 rounded-lg shadow-sm border cursor-pointer select-none ${
@@ -37,32 +98,29 @@ const FileNode: React.FC<{ data: FileNodeData }> = ({ data }) => {
     }`}>
       <Handle type="target" position={Position.Left} id="target" />
       <div className="flex items-center">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className={`h-4 w-4 mr-2 flex-shrink-0 ${
-            data.type === 'directory' ? 'text-orange-500' : 'text-gray-500'
-          }`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          {data.type === 'directory' ? (
+        {data.type === 'directory' ? (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-4 w-4 mr-2 flex-shrink-0 text-orange-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
               d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
             />
-          ) : (
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          )}
-        </svg>
-        <span className="text-sm font-medium truncate">{data.label}</span>
+          </svg>
+        ) : (
+          <div className="mr-2 flex-shrink-0">
+            {getFileIcon(data.label)}
+          </div>
+        )}
+        <span className={`text-sm font-medium truncate ${data.type === 'file' ? getFileColor(data.label) : 'text-orange-500'}`}>
+          {data.label}
+        </span>
       </div>
       <Handle type="source" position={Position.Right} id="source" />
     </div>

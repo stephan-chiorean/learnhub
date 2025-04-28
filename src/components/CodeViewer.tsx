@@ -10,6 +10,7 @@ import { SiOpenai } from 'react-icons/si'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 import AISummaryModal from './AISummaryModal'
+import { getLanguageFromPath } from '../utils/languageDetector'
 
 const CodeViewer: React.FC = () => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -396,7 +397,7 @@ const CodeViewer: React.FC = () => {
                 </TooltipProvider>
               </div>
               <SyntaxHighlighter
-                language="javascript"
+                language={getLanguageFromPath(currentFile?.path || '')}
                 style={docco}
                 customStyle={{ margin: 0, padding: '1rem' }}
                 showLineNumbers
