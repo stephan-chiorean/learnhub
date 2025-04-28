@@ -14,6 +14,7 @@ import ReactFlow, {
 } from 'reactflow'
 import { SiOpenai } from 'react-icons/si'
 import 'reactflow/dist/style.css'
+import WalkthroughModal from './WalkthroughModal'
 
 interface WorkspaceProps {
   isSidebarOpen: boolean
@@ -77,6 +78,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const navigate = useNavigate()
   const { directoryTree, isLoading, error, fetchDirectoryTree } = useWorkspace()
   const [workspaceAlias, setWorkspaceAlias] = useState(`${owner}/${repo}`)
+  const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false)
 
   const [hasFetched, setHasFetched] = useState(false)
   const [nodes, setNodes, onNodesChange] = useNodesState<Node[]>([])
@@ -241,7 +243,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
         <div className="px-6">
           <div className="bg-white rounded-lg shadow p-4 relative" style={{ height: 'calc(100vh - 14rem)' }}>
             <button
-              onClick={() => {/* TODO: Implement walkthrough generation */}}
+              onClick={() => setIsWalkthroughOpen(true)}
               className="absolute top-8 right-8 flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md z-10"
             >
               Generate Walkthrough
@@ -269,6 +271,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
           </div>
         </div>
       </div>
+      <WalkthroughModal
+        isOpen={isWalkthroughOpen}
+        onOpenChange={setIsWalkthroughOpen}
+      />
     </div>
   )
 }
