@@ -5,6 +5,10 @@ import SyntaxHighlighter from 'react-syntax-highlighter'
 import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs'
 import AnnotationModal from './AnnotationModal'
 import Notepad from './Notepad'
+import { Copy, Check } from 'lucide-react'
+import { SiOpenai } from 'react-icons/si'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 
 const CodeViewer: React.FC = () => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -26,6 +30,9 @@ const CodeViewer: React.FC = () => {
   const [snippets, setSnippets] = useState<any[]>([])
   const [hoveredAnnotation, setHoveredAnnotation] = useState<{filePath: string, startLine: number, endLine: number} | null>(null)
   const [clickedAnnotation, setClickedAnnotation] = useState<{filePath: string, startLine: number, endLine: number} | null>(null)
+  const [isAISummaryOpen, setIsAISummaryOpen] = useState(false)
+  const [isCopying, setIsCopying] = useState(false)
+  const [aiSummary, setAISummary] = useState('')
 
   React.useEffect(() => {
     if (owner && repo && path) {
@@ -166,6 +173,21 @@ const CodeViewer: React.FC = () => {
     };
   };
 
+  const handleCopyFile = async () => {
+    if (currentFile?.content) {
+      await navigator.clipboard.writeText(currentFile.content)
+      setIsCopying(true)
+      setTimeout(() => setIsCopying(false), 2000)
+    }
+  }
+
+  const handleAISummary = async () => {
+    if (!currentFile?.content) return
+    setIsAISummaryOpen(true)
+    // TODO: Implement actual AI summary generation
+    setAISummary('Generating summary...')
+  }
+
   if (isLoading) {
     return (
       <div className="flex-1 overflow-auto p-6">
@@ -199,30 +221,32 @@ const CodeViewer: React.FC = () => {
     <div className="flex h-full">
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-[95%] mx-auto">
-          <div className="flex items-center mb-6">
-            <button
-              onClick={handleBackClick}
-              className="flex items-center text-gray-600 hover:text-gray-900 mr-4"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <button
+                onClick={handleBackClick}
+                className="flex items-center text-gray-600 hover:text-gray-900 mr-4"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                />
-              </svg>
-              Back to Workspace
-            </button>
-            <h1 className="text-2xl font-bold">
-              {owner}/{repo}
-            </h1>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                  />
+                </svg>
+                Back to Workspace
+              </button>
+              <h1 className="text-2xl font-bold">
+                {owner}/{repo}
+              </h1>
+            </div>
           </div>
           <div className="grid grid-cols-[auto_300px] gap-4">
             <div className="flex items-center">
@@ -234,10 +258,38 @@ const CodeViewer: React.FC = () => {
           </div>
           <div className="grid grid-cols-[auto_300px] gap-4 mt-4">
             <div 
-              className="bg-white rounded-lg shadow p-4"
+              className="bg-white rounded-lg shadow p-4 relative"
               onMouseUp={handleTextSelection}
               ref={codeRef}
             >
+              <div className="absolute top-2 right-2 flex gap-2 z-10">
+                <button
+                  onClick={handleCopyFile}
+                  className="p-2 hover:bg-gray-100 rounded transition-colors bg-white shadow-sm"
+                  title="Copy file"
+                >
+                  {isCopying ? (
+                    <Check className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <Copy className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={handleAISummary}
+                        className="p-2 hover:bg-orange-50 rounded transition-colors bg-white shadow-sm"
+                      >
+                        <SiOpenai className="w-5 h-5 text-orange-500" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Generate an AI Summary</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <SyntaxHighlighter
                 language="javascript"
                 style={docco}
@@ -288,6 +340,19 @@ const CodeViewer: React.FC = () => {
         selection={selection}
         editingNote={editingNote}
       />
+      <Dialog open={isAISummaryOpen} onOpenChange={setIsAISummaryOpen}>
+        <DialogContent className="sm:max-w-[1200px] bg-white border-orange-200">
+          <DialogHeader>
+            <DialogTitle className="text-orange-600 flex items-center gap-2">
+              <SiOpenai className="w-5 h-5" />
+              AI Summary
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-gray-700 font-['Gaegu'] text-lg leading-tight">{aiSummary}</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

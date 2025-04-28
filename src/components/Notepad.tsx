@@ -44,7 +44,7 @@ const Notepad: React.FC<NotepadProps> = ({
   return (
     <div className="relative h-full" ref={containerRef}>
       {[...notes, ...snippets].length === 0 && (
-        <div className="absolute top-0 left-0 right-0 z-10">
+        <div className="absolute top-0 left-0 right-0 z-[1]">
           <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 mb-4">
             <div className="text-center text-orange-700">
               <div className="text-2xl mb-2">📝</div>
