@@ -35,6 +35,7 @@ const MainContent: React.FC<MainContentProps> = ({ isSidebarOpen }) => {
       }
 
       const [owner, repo] = pathParts
+      console.log('Navigating to workspace:', owner, repo)
       navigate(`/workspace/${owner}/${repo}`)
     } catch (err) {
       setError('Please enter a valid URL')

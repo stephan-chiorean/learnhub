@@ -40,6 +40,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     setIsLoading(true);
     setError(null);
     try {
+      console.log('Making API call to createWorkspace for:', owner, repo);
       const response = await axios.post('http://localhost:3001/api/createWorkspace', {
         owner,
         repo

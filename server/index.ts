@@ -3,6 +3,11 @@ import cors from 'cors';
 import axios, { AxiosError } from 'axios';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import { randomUUID } from 'crypto';
 
 dotenv.config({ path: '../.env' });
 
@@ -139,6 +144,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const execAsync = promisify(exec);
+
 // POST /api/createWorkspace
 app.post('/api/createWorkspace', async (req: Request, res: Response) => {
   try {
@@ -179,6 +186,29 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
     // Transform flat tree into nested structure
     const nestedTree = buildNestedTree(treeResponse.data.tree);
 
+    // Generate unique session ID and create temp directory path
+    const sessionId = randomUUID();
+    const walkthroughDir = path.join('/tmp', 'walkthrough');
+    const tempDir = path.join(walkthroughDir, `${owner}_${repo}_${sessionId}`);
+    
+    try {
+      // Create parent walkthrough directory if it doesn't exist
+      if (!fs.existsSync(walkthroughDir)) {
+        fs.mkdirSync(walkthroughDir, { recursive: true });
+      }
+
+      // Clone the repository using public URL
+      const cloneUrl = `https://github.com/${owner}/${repo}.git`;
+      await execAsync(`git clone --depth=1 --branch=${defaultBranch} ${cloneUrl} ${tempDir}`, {
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+      });
+
+      console.log(`Successfully cloned ${owner}/${repo} to ${tempDir}`);
+    } catch (error) {
+      console.error(`Error cloning repository: ${error}`);
+      // Don't fail the request if cloning fails, just log the error
+    }
+
     res.json({
       metadata: {
         name: repoData.name,
@@ -187,7 +217,8 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
         stars: repoData.stargazers_count,
         forks: repoData.forks_count,
       },
-      directoryTree: nestedTree
+      directoryTree: nestedTree,
+      clonedPath: tempDir
     });
   } catch (error) {
     const { status, message } = handleGitHubError(error as AxiosError);

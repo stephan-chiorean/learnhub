@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useWorkspace } from '../context/WorkspaceContext'
 import ReactFlow, {
@@ -137,7 +137,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const { directoryTree, isLoading, error, fetchDirectoryTree } = useWorkspace()
   const [workspaceAlias, setWorkspaceAlias] = useState(`${owner}/${repo}`)
   const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false)
-  const [hasFetched, setHasFetched] = useState(false)
+  const hasFetchedRef = useRef(false)
 
   // Use Maps for efficient node and edge management
   const [nodeMap, setNodeMap] = useState<Map<string, Node>>(new Map())
@@ -161,12 +161,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   }, [edges, setReactFlowEdges])
 
   useEffect(() => {
-    if (owner && repo && !hasFetched) {
+    if (owner && repo && !hasFetchedRef.current && !isLoading) {
       console.log('Fetching directory tree for:', owner, repo)
       fetchDirectoryTree(owner, repo)
-      setHasFetched(true)
+      hasFetchedRef.current = true
     }
-  }, [owner, repo, fetchDirectoryTree, hasFetched])
+  }, [owner, repo, fetchDirectoryTree, isLoading])
 
   const createNode = useCallback((item: any, parentId: string | null, index: number, level: number = 0): Node => {
     const x = level * 300
