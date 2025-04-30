@@ -56,6 +56,7 @@ async function processChunks() {
                         metadata: {
                             filePath: chunk.filePath,
                             type: chunk.type,
+                            content: chunk.content,
                             ...(chunk.functionName && { functionName: chunk.functionName })
                         }
                     };
