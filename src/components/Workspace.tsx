@@ -16,6 +16,7 @@ import { SiOpenai, SiPython, SiDocker, SiYaml, SiJavascript, SiTypescript, SiJso
 import { FaFileCode, FaFileAlt } from 'react-icons/fa'
 import 'reactflow/dist/style.css'
 import WalkthroughModal from './WalkthroughModal'
+import ChatModal from './ChatModal'
 
 interface WorkspaceProps {
   isSidebarOpen: boolean
@@ -137,6 +138,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const { directoryTree, isLoading, error, fetchDirectoryTree } = useWorkspace()
   const [workspaceAlias, setWorkspaceAlias] = useState(`${owner}/${repo}`)
   const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false)
+  const [isChatOpen, setIsChatOpen] = useState(false)
   const hasFetchedRef = useRef(false)
 
   // Use Maps for efficient node and edge management
@@ -306,13 +308,22 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
         </div>
         <div className="px-6">
           <div className="bg-white rounded-lg shadow p-4 relative" style={{ height: 'calc(100vh - 14rem)' }}>
-            <button
-              onClick={() => setIsWalkthroughOpen(true)}
-              className="absolute top-8 right-8 flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md z-10"
-            >
-              Generate Walkthrough
-              <SiOpenai className="w-5 h-5" />
-            </button>
+            <div className="absolute top-8 right-8 flex items-center gap-4 z-10">
+              <button
+                onClick={() => setIsChatOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md"
+              >
+                Ask AI
+                <SiOpenai className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setIsWalkthroughOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md"
+              >
+                Generate Walkthrough
+                <SiOpenai className="w-5 h-5" />
+              </button>
+            </div>
             <ReactFlow
               nodes={reactFlowNodes}
               edges={reactFlowEdges}
@@ -338,6 +349,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
       <WalkthroughModal
         isOpen={isWalkthroughOpen}
         onOpenChange={setIsWalkthroughOpen}
+      />
+      <ChatModal
+        isOpen={isChatOpen}
+        onOpenChange={setIsChatOpen}
       />
     </div>
   )
