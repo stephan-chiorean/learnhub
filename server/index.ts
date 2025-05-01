@@ -207,7 +207,16 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       .join('\n---\n');
 
     // Create the prompt
-    const prompt = `Based on the following code chunks, ${question}\n\n${formattedChunks}`;
+    const prompt = `Based on the following code chunks, ${question}\n\n${formattedChunks}\n\nPlease provide a structured response in JSON format with the following structure:
+    {
+      "title": "A concise title for the response",
+      "mainPurpose": "One paragraph explaining the main purpose or answer",
+      "keyComponents": [
+        {"name": "Component 1", "description": "Description of component 1"},
+        {"name": "Component 2", "description": "Description of component 2"}
+      ],
+      "overallStructure": "One paragraph explaining the overall structure or flow"
+    }`;
 
     // Get response from OpenAI
     const response = await openai.chat.completions.create({
@@ -215,7 +224,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant that explains code. Focus on explaining the code based on the provided code chunks."
+          content: "You are a helpful assistant that explains code. Focus on explaining the code based on the provided code chunks. Always respond with valid JSON matching the requested structure."
         },
         {
           role: "user",
@@ -225,8 +234,25 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       temperature: 0.7
     });
 
+    let responseJson;
+    try {
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error('Empty response from OpenAI');
+      }
+      responseJson = JSON.parse(content);
+    } catch (e) {
+      // If parsing fails, create a structured response from the raw text
+      responseJson = {
+        title: "Code Explanation",
+        mainPurpose: response.choices[0].message.content || "No response available",
+        keyComponents: [],
+        overallStructure: ""
+      };
+    }
+
     res.json({ 
-      response: response.choices[0].message.content,
+      response: JSON.stringify(responseJson),
       relevantFiles: queryResponse.matches
         .filter(match => match.metadata) // Filter out matches without metadata
         .map(match => ({

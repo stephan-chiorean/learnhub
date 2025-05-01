@@ -1,10 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SiOpenai } from 'react-icons/si';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+
+interface KeyComponent {
+  name: string;
+  description: string;
+}
+
+interface SummaryJSON {
+  title: string;
+  mainPurpose: string;
+  keyComponents: KeyComponent[];
+  overallStructure: string;
+}
 
 interface Message {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | SummaryJSON;
   relevantFiles?: Array<{
     filePath: string;
     similarity: number;
@@ -16,8 +28,11 @@ interface ChatModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const fontClass = "font-['Gaegu'] text-lg text-gray-700";
+
 const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -57,9 +72,18 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
       }
 
       const data = await response.json();
+      
+      // Try to parse the response as JSON, if it fails, use it as a string
+      let formattedContent: string | SummaryJSON;
+      try {
+        formattedContent = JSON.parse(data.response);
+      } catch {
+        formattedContent = data.response;
+      }
+
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: data.response,
+        content: formattedContent,
         relevantFiles: data.relevantFiles
       }]);
     } catch (error) {
@@ -71,6 +95,41 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleFileClick = (filePath: string) => {
+    if (!owner || !repo) return;
+    navigate(`/workspace/${owner}/${repo}/file?path=${encodeURIComponent(filePath)}`);
+  };
+
+  const renderMessageContent = (content: string | SummaryJSON) => {
+    if (typeof content === 'string') {
+      return <p className={fontClass}>{content}</p>;
+    }
+
+    return (
+      <div className={fontClass + " max-w-full break-words"}>
+        <h2 className="text-2xl font-bold mb-2">{content.title}</h2>
+        <div className="mb-4">
+          <span className="block text-xl font-semibold mb-1">Main Purpose</span>
+          <span>{content.mainPurpose}</span>
+        </div>
+        <div className="mb-4">
+          <span className="block text-xl font-semibold mb-1">Key Components</span>
+          <ol className="list-decimal ml-6">
+            {content.keyComponents.map((comp, idx) => (
+              <li key={idx} className="mb-1">
+                <span className="font-bold">{comp.name}:</span> {comp.description}
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div>
+          <span className="block text-xl font-semibold mb-1">Overall Structure</span>
+          <span>{content.overallStructure}</span>
+        </div>
+      </div>
+    );
   };
 
   if (!isOpen) return null;
@@ -101,14 +160,19 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
                     : 'bg-gray-100 text-gray-900'
                 }`}
               >
-                <p className="font-['Gaegu'] text-lg">{message.content}</p>
+                {renderMessageContent(message.content)}
                 {message.relevantFiles && message.relevantFiles.length > 0 && (
                   <div className="mt-2 text-sm text-gray-600">
                     <p className="font-['Gaegu']">Relevant files:</p>
                     <ul className="list-disc list-inside">
                       {message.relevantFiles.map((file, i) => (
                         <li key={i} className="font-['Gaegu']">
-                          {file.filePath} ({(file.similarity * 100).toFixed(1)}% relevant)
+                          <button
+                            onClick={() => handleFileClick(file.filePath)}
+                            className="text-orange-600 hover:text-orange-800 hover:underline"
+                          >
+                            {file.filePath} ({(file.similarity * 100).toFixed(1)}% relevant)
+                          </button>
                         </li>
                       ))}
                     </ul>
