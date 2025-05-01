@@ -6,7 +6,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   return (
-    <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 flex items-center px-4 z-10 shadow-sm">
+    <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 flex items-center px-4 z-20 shadow-sm">
       <div 
         className="hamburger-menu flex flex-col justify-center items-center h-10 w-10 rounded-full hover:bg-gray-100 cursor-pointer"
         onClick={onMenuClick}

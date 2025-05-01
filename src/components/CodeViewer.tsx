@@ -324,7 +324,7 @@ const CodeViewer: React.FC = () => {
 
   return (
     <div className="flex h-full">
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-6 pt-20">
         <div className="max-w-[95%] mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
