@@ -44,6 +44,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [contexts, setContexts] = useState<Context[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -52,6 +53,21 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const adjustHeight = () => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    };
+
+    textarea.addEventListener('input', adjustHeight);
+    adjustHeight(); // Initial adjustment
+
+    return () => textarea.removeEventListener('input', adjustHeight);
+  }, []);
 
   const handleContextSelect = (path: string) => {
     setContexts(prev => [...prev, { path, type: path.endsWith('/') ? 'directory' : 'file' }]);
@@ -267,17 +283,29 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
           )}
 
           <form onSubmit={handleSubmit} className="flex space-x-2">
-            <input
-              type="text"
+            <textarea
+              ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
               placeholder="Ask anything about the code..."
-              className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 font-['Gaegu'] text-lg"
+              rows={1}
+              style={{
+                resize: 'none',
+                minHeight: '44px', // matches previous input height
+                height: 'auto'
+              }}
+              className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 font-['Gaegu'] text-lg overflow-hidden"
             />
             <button
               type="submit"
               disabled={isLoading || !input.trim()}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed font-['Gaegu'] text-lg"
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed font-['Gaegu'] text-lg self-end"
             >
               Send
             </button>
