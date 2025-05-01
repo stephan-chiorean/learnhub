@@ -41,9 +41,17 @@ const path = require('path');
 const recast = require('recast');
 const { parse } = require('@babel/parser');
 const { v4: uuidv4 } = require('uuid');
-const repoDir = '/tmp/walkthrough/stephan-chiorean_PromptVaultAdmin_a735d7ab-476a-42f2-bd66-2ac2c2904efe';
-const outputFile = '/tmp/walkthrough/PromptVaultAdmin_chunks5.json';
-const errorFile = '/tmp/walkthrough/PromptVaultAdmin_errors5.json';
+
+// Get command line arguments
+const repoDir = process.argv[2];
+const outputFile = process.argv[3];
+const errorFile = process.argv[4];
+
+if (!repoDir || !outputFile || !errorFile) {
+    console.error('Usage: node chunkRepo.cjs <repoDir> <outputFile> <errorFile>');
+    process.exit(1);
+}
+
 async function walkAndChunk(dirPath) {
     const chunks = [];
     const errors = [];

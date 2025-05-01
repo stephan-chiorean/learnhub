@@ -4,7 +4,15 @@ const path = require('path');
 const { Pinecone } = require('@pinecone-database/pinecone');
 const OpenAI = require('openai');
 
-const NAMESPACE = 'PromptVaultAdmin';
+// Get command line arguments
+const chunksFile = process.argv[2];
+const namespace = process.argv[3];
+
+if (!chunksFile || !namespace) {
+    console.error('Usage: node embedAndUpsert.cjs <chunksFile> <namespace>');
+    process.exit(1);
+}
+
 const BATCH_SIZE = 100;
 
 // Initialize clients
@@ -38,7 +46,7 @@ async function processChunks() {
         const index = pinecone.index(process.env.PINECONE_INDEX);
 
         // Read chunks from file
-        const chunks = JSON.parse(fs.readFileSync('/tmp/walkthrough/PromptVaultAdmin_chunks5.json', 'utf-8'));
+        const chunks = JSON.parse(fs.readFileSync(chunksFile, 'utf-8'));
         console.log(`\nProcessing ${chunks.length} chunks...`);
 
         // Process chunks in batches
@@ -64,7 +72,7 @@ async function processChunks() {
 
                 // Upsert to Pinecone
                 console.log('Attempting to upsert vectors to Pinecone...');
-                await index.namespace(NAMESPACE).upsert(vectors);
+                await index.namespace(namespace).upsert(vectors);
                 console.log(`Upserted batch ${Math.floor(i / BATCH_SIZE) + 1}`);
             } catch (batchError) {
                 console.error('Error processing batch:', batchError);
