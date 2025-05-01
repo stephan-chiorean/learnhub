@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SiOpenai } from 'react-icons/si';
 import { useParams, useNavigate } from 'react-router-dom';
+import ContextPopover from './ContextPopover';
 
 interface KeyComponent {
   name: string;
@@ -28,6 +29,11 @@ interface ChatModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface Context {
+  path: string;
+  type: 'file' | 'directory';
+}
+
 const fontClass = "font-['Gaegu'] text-lg text-gray-700";
 
 const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
@@ -36,6 +42,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [contexts, setContexts] = useState<Context[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -45,6 +52,14 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const handleContextSelect = (path: string) => {
+    setContexts(prev => [...prev, { path, type: path.endsWith('/') ? 'directory' : 'file' }]);
+  };
+
+  const handleRemoveContext = (index: number) => {
+    setContexts(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +78,8 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
         },
         body: JSON.stringify({
           namespace: `${owner}_${repo}`,
-          question: userMessage
+          question: userMessage,
+          contexts: contexts.map(c => c.path)
         })
       });
 
@@ -195,8 +211,62 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
           <div ref={messagesEndRef} />
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 border-t">
-          <div className="flex space-x-2">
+        <div className="p-4 border-t space-y-3">
+          <div className="flex items-center gap-2">
+            <ContextPopover onSelect={handleContextSelect} />
+          </div>
+          
+          {contexts.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {contexts.map((context, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1"
+                >
+                  {context.type === 'file' ? (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4 text-gray-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4 text-gray-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                      />
+                    </svg>
+                  )}
+                  <span className="font-['Gaegu'] text-sm">{context.path}</span>
+                  <button
+                    onClick={() => handleRemoveContext(index)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="flex space-x-2">
             <input
               type="text"
               value={input}
@@ -211,8 +281,8 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
             >
               Send
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );
