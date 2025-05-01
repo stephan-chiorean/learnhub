@@ -13,6 +13,7 @@ import {
   embedAndUpsertChunks,
   initializeEnvironment 
 } from './workspaces/workspaceHelpers.ts';
+import { Pinecone } from '@pinecone-database/pinecone';
 
 dotenv.config({ path: '../.env' });
 initializeEnvironment();
@@ -159,6 +160,83 @@ app.post('/api/generateSummary', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error generating summary:', error);
     res.status(500).json({ error: 'Failed to generate summary' });
+  }
+});
+
+// POST /api/chat
+app.post('/api/chat', async (req: Request, res: Response) => {
+  try {
+    const { namespace, question } = req.body;
+
+    if (!namespace || !question) {
+      return res.status(400).json({ error: 'Namespace and question are required' });
+    }
+
+    if (!process.env.PINECONE_API_KEY || !process.env.PINECONE_INDEX) {
+      return res.status(500).json({ error: 'Pinecone configuration is missing' });
+    }
+
+    // Get embedding for the question
+    const embedding = await openai.embeddings.create({
+      model: 'text-embedding-ada-002',
+      input: question,
+      encoding_format: 'float'
+    });
+
+    // Query Pinecone
+    const pinecone = new Pinecone({
+      apiKey: process.env.PINECONE_API_KEY,
+      controllerHostUrl: 'https://api.pinecone.io'
+    });
+
+    const index = pinecone.index(process.env.PINECONE_INDEX);
+    const queryResponse = await index.namespace(namespace).query({
+      vector: embedding.data[0].embedding,
+      topK: 10,
+      includeMetadata: true,
+      includeValues: false
+    });
+
+    // Format the chunks for the prompt
+    const formattedChunks = queryResponse.matches
+      .filter(match => match.metadata) // Filter out matches without metadata
+      .map(match => {
+        const metadata = match.metadata!; // We know it exists due to filter
+        return `File: ${metadata.filePath}\nType: ${metadata.type}\n${metadata.functionName ? `Function: ${metadata.functionName}\n` : ''}Content:\n${metadata.content}\n`;
+      })
+      .join('\n---\n');
+
+    // Create the prompt
+    const prompt = `Based on the following code chunks, ${question}\n\n${formattedChunks}`;
+
+    // Get response from OpenAI
+    const response = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that explains code. Focus on explaining the code based on the provided code chunks."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.7
+    });
+
+    res.json({ 
+      response: response.choices[0].message.content,
+      relevantFiles: queryResponse.matches
+        .filter(match => match.metadata) // Filter out matches without metadata
+        .map(match => ({
+          filePath: match.metadata!.filePath,
+          similarity: match.score
+        }))
+    });
+  } catch (error) {
+    console.error('Error in chat endpoint:', error);
+    res.status(500).json({ error: 'Failed to process chat request' });
   }
 });
 

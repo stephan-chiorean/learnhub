@@ -1,9 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SiOpenai } from 'react-icons/si';
+import { useParams } from 'react-router-dom';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  relevantFiles?: Array<{
+    filePath: string;
+    similarity: number;
+  }>;
 }
 
 interface ChatModalProps {
@@ -12,6 +17,7 @@ interface ChatModalProps {
 }
 
 const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
+  const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +33,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !owner || !repo) return;
 
     const userMessage = input.trim();
     setInput('');
@@ -35,12 +41,33 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
     setIsLoading(true);
 
     try {
-      // TODO: Implement actual API call
-      const response = await new Promise(resolve => setTimeout(() => resolve('This is a placeholder response.'), 1000));
-      setMessages(prev => [...prev, { role: 'assistant', content: response as string }]);
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          namespace: `${owner}_${repo}`,
+          question: userMessage
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const data = await response.json();
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: data.response,
+        relevantFiles: data.relevantFiles
+      }]);
     } catch (error) {
       console.error('Error getting AI response:', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Sorry, I encountered an error. Please try again.' 
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -75,6 +102,18 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
                 }`}
               >
                 <p className="font-['Gaegu'] text-lg">{message.content}</p>
+                {message.relevantFiles && message.relevantFiles.length > 0 && (
+                  <div className="mt-2 text-sm text-gray-600">
+                    <p className="font-['Gaegu']">Relevant files:</p>
+                    <ul className="list-disc list-inside">
+                      {message.relevantFiles.map((file, i) => (
+                        <li key={i} className="font-['Gaegu']">
+                          {file.filePath} ({(file.similarity * 100).toFixed(1)}% relevant)
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
           ))}
