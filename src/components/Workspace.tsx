@@ -12,7 +12,9 @@ import ReactFlow, {
   NodeTypes,
   Handle,
 } from 'reactflow'
-import { SiOpenai } from 'react-icons/si'
+import { RiSparklingLine, RiShareLine } from 'react-icons/ri'
+import { PiNotePencilBold } from 'react-icons/pi'
+import { FaComments } from 'react-icons/fa'
 import 'reactflow/dist/style.css'
 import { WalkthroughModal } from './ui/walkthrough'
 import ChatModal from './ChatModal'
@@ -198,7 +200,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
           target: childNode.id,
           type: 'smoothstep',
           animated: true,
-          style: { stroke: '#94a3b8' },
+          style: { stroke: '#f97316' },
         })
       })
 
@@ -234,9 +236,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
 
   return (
     <div className={`flex-1 overflow-auto pt-14 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto pb-8">
         <div className="flex items-center justify-between p-6">
-          <h1 className="text-2xl font-['Gaegu'] text-orange-700">Code Diagram</h1>
           <input
             type="text"
             value={workspaceAlias}
@@ -245,25 +246,28 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
             placeholder="Workspace alias"
             size={workspaceAlias.length || 20}
           />
-        </div>
-        <div className="px-6">
-          <div className="bg-white rounded-lg shadow p-4 relative" style={{ height: 'calc(100vh - 14rem)' }}>
-            <div className="absolute top-8 right-8 flex items-center gap-4 z-10">
-              <button
-                onClick={() => setIsChatOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md"
-              >
-                Ask AI
-                <SiOpenai className="w-5 h-5" />
-              </button>
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setIsWalkthroughOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md"
+              className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md border border-orange-700"
             >
               Generate Walkthrough
-              <SiOpenai className="w-5 h-5" />
+              <RiSparklingLine className="w-5 h-5" />
             </button>
-            </div>
+            <button
+              className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+            >
+              <RiShareLine className="w-5 h-5" />
+            </button>
+            <button
+              className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+            >
+              <PiNotePencilBold className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+        <div className="px-6">
+          <div className="bg-white rounded-lg shadow p-4 relative" style={{ height: 'calc(100vh - 18rem)' }}>
             <ReactFlow
               nodes={reactFlowNodes}
               edges={reactFlowEdges}
@@ -275,14 +279,24 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
               defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
               minZoom={0.1}
               maxZoom={2}
-              style={{ background: '#f8fafc' }}
+              style={{ background: '#f1f5f9' }}
               panOnScroll
               zoomOnScroll={false}
               panOnDrag={false}
             >
-              <Background />
+              <Background color="#cbd5e1" gap={16} />
               <Controls />
             </ReactFlow>
+          </div>
+          <div className="flex justify-between items-center mt-8 mb-6">
+            <h1 className="text-2xl font-['Gaegu'] text-orange-700">Code Diagram</h1>
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md border border-orange-700"
+            >
+              Ask AI
+              <FaComments className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>
