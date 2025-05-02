@@ -14,7 +14,7 @@ import ReactFlow, {
 } from 'reactflow'
 import { SiOpenai } from 'react-icons/si'
 import 'reactflow/dist/style.css'
-import WalkthroughModal from './WalkthroughModal'
+import { WalkthroughModal } from './ui/walkthrough'
 import ChatModal from './ChatModal'
 import { getFileIcon, getFileColor } from '../utils/fileIcons'
 

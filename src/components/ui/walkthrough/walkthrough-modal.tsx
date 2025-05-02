@@ -1,6 +1,8 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog'
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../dialog'
 import { SiOpenai } from 'react-icons/si'
 import { Lightbulb, BookOpen, Brain, StickyNote, GitBranch } from 'lucide-react'
+import { MultiStepModal } from './multi-step-modal'
 
 interface WalkthroughModalProps {
   isOpen: boolean
@@ -11,6 +13,30 @@ const WalkthroughModal: React.FC<WalkthroughModalProps> = ({
   isOpen,
   onOpenChange,
 }) => {
+  const [showMultiStep, setShowMultiStep] = useState(false);
+
+  const handleStartWalkthrough = () => {
+    setShowMultiStep(true);
+  };
+
+  const handleMultiStepSubmit = (data: any) => {
+    console.log('Walkthrough data:', data);
+    onOpenChange(false);
+  };
+
+  if (showMultiStep) {
+    return (
+      <MultiStepModal
+        isOpen={isOpen}
+        onClose={() => {
+          setShowMultiStep(false);
+          onOpenChange(false);
+        }}
+        onSubmit={handleMultiStepSubmit}
+      />
+    );
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] bg-white border-orange-200">
@@ -98,7 +124,7 @@ const WalkthroughModal: React.FC<WalkthroughModalProps> = ({
         </div>
         <div className="mt-6 flex justify-end">
           <button
-            onClick={() => onOpenChange(false)}
+            onClick={handleStartWalkthrough}
             className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg"
           >
             Start Walkthrough
