@@ -288,14 +288,24 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
               defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
               minZoom={0.1}
               maxZoom={2}
-              style={{ background: '#f1f5f9' }}
+              style={{ background: '#e2e8f0' }}
               panOnScroll
               zoomOnScroll={false}
               panOnDrag={false}
             >
-              <Background color="#cbd5e1" gap={16} />
+              <Background color="#94a3b8" gap={16} />
               <Controls />
             </ReactFlow>
+          </div>
+          <div className="flex justify-between items-center mt-8 mb-6">
+            <h1 className="text-3xl font-['Gaegu'] text-orange-700">Code Explorer</h1>
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md border border-orange-700"
+            >
+              Ask AI
+              <FaComments className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>
