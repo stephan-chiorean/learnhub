@@ -316,13 +316,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
                 Ask AI
                 <SiOpenai className="w-5 h-5" />
               </button>
-              <button
-                onClick={() => setIsWalkthroughOpen(true)}
+            <button
+              onClick={() => setIsWalkthroughOpen(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md"
-              >
-                Generate Walkthrough
-                <SiOpenai className="w-5 h-5" />
-              </button>
+            >
+              Generate Walkthrough
+              <SiOpenai className="w-5 h-5" />
+            </button>
             </div>
             <ReactFlow
               nodes={reactFlowNodes}

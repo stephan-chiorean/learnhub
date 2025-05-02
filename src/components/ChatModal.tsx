@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { SiOpenai } from 'react-icons/si';
 import { useParams, useNavigate } from 'react-router-dom';
 import ContextPopover from './ContextPopover';
+import { Lightbulb, BookOpen, Brain, StickyNote, GitBranch } from 'lucide-react';
+import Tips from './ui/tips';
 
 interface KeyComponent {
   name: string;
@@ -43,8 +45,16 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [contexts, setContexts] = useState<Context[]>([]);
+  const [showTips, setShowTips] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    // Reset tips visibility when modal opens
+    if (isOpen) {
+      setShowTips(true);
+    }
+  }, [isOpen]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -85,6 +95,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
+    setShowTips(false);
 
     try {
       const response = await fetch('/api/chat', {
@@ -178,6 +189,8 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
             ✕
           </button>
         </div>
+
+        {showTips && <Tips onHide={() => setShowTips(false)} />}
         
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((message, index) => (
