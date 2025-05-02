@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import ContextPopover from './ContextPopover';
 import { Lightbulb, BookOpen, Brain, StickyNote, GitBranch } from 'lucide-react';
 import Tips from './ui/tips';
+import { getFileIcon } from '../utils/fileIcons';
 
 interface KeyComponent {
   name: string;
@@ -79,8 +80,8 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
     return () => textarea.removeEventListener('input', adjustHeight);
   }, []);
 
-  const handleContextSelect = (path: string) => {
-    setContexts(prev => [...prev, { path, type: path.endsWith('/') ? 'directory' : 'file' }]);
+  const handleContextSelect = (path: string, type: 'file' | 'directory') => {
+    setContexts(prev => [...prev, { path, type }]);
   };
 
   const handleRemoveContext = (index: number) => {
@@ -253,24 +254,11 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
                   className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1"
                 >
                   {context.type === 'file' ? (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 text-gray-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
+                    getFileIcon(context.path)
                   ) : (
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 text-gray-500"
+                      className="h-4 w-4 text-orange-500"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -283,7 +271,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
                       />
                     </svg>
                   )}
-                  <span className="font-['Gaegu'] text-sm">{context.path}</span>
+                  <span className="text-sm text-gray-700">{context.path}</span>
                   <button
                     onClick={() => handleRemoveContext(index)}
                     className="text-gray-500 hover:text-gray-700"
