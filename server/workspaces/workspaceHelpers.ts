@@ -76,6 +76,7 @@ interface TreeNode {
   path: string;
   type: 'blob' | 'tree';
   children?: TreeNode[];
+  parentPath?: string;
 }
 
 // Helper function to handle GitHub API errors
@@ -128,12 +129,14 @@ const buildNestedTree = (items: TreeItem[]): TreeNode[] => {
   items.forEach(item => {
     const pathParts = item.path.split('/');
     const name = pathParts[pathParts.length - 1];
+    const parentPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : undefined;
     
     const node: TreeNode = {
       name,
       path: item.path,
       type: item.type,
-      children: item.type === 'tree' ? [] : undefined
+      children: item.type === 'tree' ? [] : undefined,
+      parentPath
     };
 
     pathMap[item.path] = node;

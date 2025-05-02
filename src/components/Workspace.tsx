@@ -11,6 +11,7 @@ import ReactFlow, {
   Position,
   NodeTypes,
   Handle,
+  NodeProps,
 } from 'reactflow'
 import { RiSparklingLine, RiShareLine } from 'react-icons/ri'
 import { PiNotePencilBold } from 'react-icons/pi'
@@ -30,31 +31,22 @@ interface FileNodeData {
   path: string
   isExpanded?: boolean
   children?: any[]
+  parentPath?: string
 }
 
-const FileNode: React.FC<{ data: FileNodeData }> = ({ data }) => {
+const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
+  const isRoot = !data.parentPath;
   return (
     <div className={`px-4 py-2 rounded-lg shadow-sm border cursor-pointer select-none ${
-      data.type === 'directory' 
-        ? 'bg-orange-50 border-orange-200 hover:bg-orange-100' 
+      data.type === 'directory'
+        ? 'bg-orange-50 border-orange-200 hover:bg-orange-100'
         : 'bg-white border-gray-200 hover:bg-gray-50'
     }`}>
-      <Handle type="target" position={Position.Left} id="target" />
+      {!isRoot && <Handle type="target" position={Position.Top} id="target" />}
       <div className="flex items-center">
         {data.type === 'directory' ? (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-4 w-4 mr-2 flex-shrink-0 text-orange-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-            />
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 flex-shrink-0 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
         ) : (
           <div className="mr-2 flex-shrink-0">
@@ -65,7 +57,7 @@ const FileNode: React.FC<{ data: FileNodeData }> = ({ data }) => {
           {data.label}
         </span>
       </div>
-      <Handle type="source" position={Position.Right} id="source" />
+      {data.type === 'directory' && <Handle type="source" position={Position.Bottom} id="source" />}
     </div>
   )
 }
@@ -83,19 +75,15 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const hasFetchedRef = useRef(false)
 
-  // Use Maps for efficient node and edge management
   const [nodeMap, setNodeMap] = useState<Map<string, Node>>(new Map())
   const [edgeMap, setEdgeMap] = useState<Map<string, Edge>>(new Map())
 
-  // Convert Maps to arrays for ReactFlow
   const nodes = useMemo(() => Array.from(nodeMap.values()), [nodeMap])
   const edges = useMemo(() => Array.from(edgeMap.values()), [edgeMap])
 
-  // Initialize ReactFlow state with our nodes and edges
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState(nodes)
   const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState(edges)
 
-  // Update ReactFlow state when our nodes or edges change
   useEffect(() => {
     setReactFlowNodes(nodes)
   }, [nodes, setReactFlowNodes])
@@ -106,139 +94,160 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
 
   useEffect(() => {
     if (owner && repo && !hasFetchedRef.current && !isLoading) {
-      console.log('Fetching directory tree for:', owner, repo)
       fetchDirectoryTree(owner, repo)
       hasFetchedRef.current = true
     }
   }, [owner, repo, fetchDirectoryTree, isLoading])
 
-  const createNode = useCallback((item: any, parentId: string | null, index: number, level: number = 0): Node => {
-    const x = level * 300
-    const y = index * 100 + (level * 20)
+  const NODE_VERTICAL_SPACING = 120;
+  const CHILD_HORIZONTAL_SPACING = 300;
 
-    return {
-      id: item.path,
-      type: 'fileNode',
-      position: { x, y },
-      data: {
-        label: item.name,
-        type: item.type === 'tree' ? 'directory' : 'file',
-        path: item.path,
-        children: item.children || [],
-        isExpanded: false,
-      },
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
-      parentNode: parentId || undefined,
-      style: {
-        width: 200,
-        height: 40,
-      },
-    }
-  }, [])
+  const createNode = useCallback(
+    (
+      item: any,
+      parentId: string | null,
+      index: number,
+      siblingCount = 1
+    ): Node => {
+      let x = 0;
+      let y = 0;
+      let nodeParent: string | undefined = undefined;
+      let extent: 'parent' | undefined = undefined;
 
-  // Initialize root nodes when directory tree is loaded
+      if (parentId) {
+        // Children: position relative to parent center, use parentNode and extent: 'parent'
+        const middleIndex = (siblingCount - 1) / 2;
+        x = (index - middleIndex) * CHILD_HORIZONTAL_SPACING;
+        y = NODE_VERTICAL_SPACING;
+        nodeParent = parentId;
+        extent = 'parent';
+      } else {
+        // Root nodes: global position
+        x = index * 250;
+        y = 0;
+        nodeParent = undefined;
+        extent = undefined;
+      }
+
+      return {
+        id: item.path,
+        type: 'fileNode',
+        position: { x, y },
+        data: {
+          label: item.name,
+          type: item.type === 'tree' ? 'directory' : 'file',
+          path: item.path,
+          children: item.children || [],
+          isExpanded: false,
+          parentPath: parentId,
+        },
+        sourcePosition: Position.Bottom,
+        targetPosition: Position.Top,
+        parentNode: nodeParent,
+        extent,
+        style: {
+          width: 200,
+          height: 40,
+        },
+      };
+    },
+    []
+  );
+
   useEffect(() => {
     if (directoryTree && directoryTree.length > 0) {
-      const newNodes = new Map<string, Node>()
-      const newEdges = new Map<string, Edge>()
+      const newNodes = new Map<string, Node>();
+      const newEdges = new Map<string, Edge>();
 
-      // Only create root-level nodes initially
       directoryTree.forEach((item, index) => {
-        const node = createNode(item, null, index)
-        newNodes.set(node.id, node)
-      })
+        const node = createNode(item, null, index, directoryTree.length);
+        newNodes.set(node.id, node);
+      });
 
-      setNodeMap(newNodes)
-      setEdgeMap(newEdges)
+      setNodeMap(newNodes);
+      setEdgeMap(newEdges);
     }
   }, [directoryTree, createNode])
 
-  const toggleFolder = useCallback((node: Node) => {
-    const fileData = node.data as FileNodeData
-    if (!fileData.children) return
+  const toggleFolder = useCallback(
+    (node: Node) => {
+      const fileData = node.data as FileNodeData;
+      if (!fileData.children) return;
 
-    const alreadyExpanded = fileData.isExpanded
+      const alreadyExpanded = fileData.isExpanded;
+      const parentPath = fileData.parentPath;
 
-    if (alreadyExpanded) {
-      // Collapse folder - remove all descendants
-      const newNodes = new Map(nodeMap)
-      const newEdges = new Map(edgeMap)
-      
-      // Efficiently remove all descendants
+      const newNodes = new Map(nodeMap);
+      const newEdges = new Map(edgeMap);
+
+      // Helper to remove all descendants of a node
       const removeDescendants = (parentId: string) => {
-        const children = Array.from(newNodes.values()).filter(n => n.parentNode === parentId)
+        const children = Array.from(newNodes.values()).filter(n => n.data.parentPath === parentId);
         children.forEach(child => {
-          newNodes.delete(child.id)
-          newEdges.delete(`${parentId}-${child.id}`)
+          newNodes.delete(child.id);
+          newEdges.delete(`${parentId}-${child.id}`);
           if ((child.data as FileNodeData).type === 'directory') {
-            removeDescendants(child.id)
+            removeDescendants(child.id);
           }
-        })
+        });
+      };
+
+      if (alreadyExpanded) {
+        // Collapse this node and remove its descendants
+        removeDescendants(node.id);
+        newNodes.set(node.id, { ...node, data: { ...fileData, isExpanded: false } });
+        setNodeMap(newNodes);
+        setEdgeMap(newEdges);
+      } else {
+        // Collapse all siblings at this level and remove their descendants
+        Array.from(newNodes.values())
+          .filter(n => n.data.parentPath === parentPath && n.id !== node.id && (n.data as FileNodeData).isExpanded)
+          .forEach(sibling => {
+            removeDescendants(sibling.id);
+            newNodes.set(sibling.id, { ...sibling, data: { ...sibling.data, isExpanded: false } });
+          });
+
+        // Expand this node and add its children
+        const siblingCount = fileData.children.length;
+        fileData.children.forEach((child, index) => {
+          const childNode = createNode(child, node.id, index, siblingCount);
+          newNodes.set(childNode.id, childNode);
+          newEdges.set(`${node.id}-${childNode.id}`, {
+            id: `${node.id}-${childNode.id}`,
+            source: node.id,
+            target: childNode.id,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: '#f97316' },
+          });
+        });
+        newNodes.set(node.id, { ...node, data: { ...fileData, isExpanded: true } });
+        setNodeMap(newNodes);
+        setEdgeMap(newEdges);
       }
-
-      removeDescendants(node.id)
-      newNodes.set(node.id, {
-        ...node,
-        data: { ...fileData, isExpanded: false }
-      })
-
-      setNodeMap(newNodes)
-      setEdgeMap(newEdges)
-    } else {
-      // Expand folder - add children
-      const newNodes = new Map(nodeMap)
-      const newEdges = new Map(edgeMap)
-
-      // Add children nodes and edges
-      fileData.children.forEach((child, index) => {
-        const childNode = createNode(child, node.id, index, node.position.x / 300 + 1)
-        newNodes.set(childNode.id, childNode)
-        newEdges.set(`${node.id}-${childNode.id}`, {
-          id: `${node.id}-${childNode.id}`,
-          source: node.id,
-          target: childNode.id,
-          type: 'smoothstep',
-          animated: true,
-          style: { stroke: '#f97316' },
-        })
-      })
-
-      // Update parent node's expanded state
-      newNodes.set(node.id, {
-        ...node,
-        data: { ...fileData, isExpanded: true }
-      })
-
-      setNodeMap(newNodes)
-      setEdgeMap(newEdges)
-    }
-  }, [nodeMap, edgeMap, createNode])
+    },
+    [nodeMap, edgeMap, createNode]
+  )
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    event.stopPropagation()
-    const data = node.data as FileNodeData
+    event.stopPropagation();
+    const data = node.data as FileNodeData;
 
     if (data.type === 'directory') {
-      toggleFolder(node)
+      toggleFolder(node);
     } else if (data.type === 'file' && owner && repo) {
-      navigate(`/workspace/${owner}/${repo}/file?path=${encodeURIComponent(data.path)}`)
+      navigate(`/workspace/${owner}/${repo}/file?path=${encodeURIComponent(data.path)}`);
     }
-  }, [toggleFolder, owner, repo, navigate])
+  }, [toggleFolder, owner, repo, navigate]);
 
-  if (isLoading) {
-    return <div className={`flex-1 overflow-auto ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>Loading...</div>
-  }
-
-  if (error) {
-    return <div className={`flex-1 overflow-auto ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>{error}</div>
-  }
+  if (isLoading) return <div className={`flex-1 overflow-auto ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>Loading...</div>;
+  if (error) return <div className={`flex-1 overflow-auto ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>{error}</div>;
 
   return (
     <div className={`flex-1 overflow-auto pt-14 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
-      <div className="max-w-7xl mx-auto pb-8">
+      <div className="mx-auto pb-8">
         <div className="flex items-center justify-between p-6">
-          <input
+        <input
             type="text"
             value={workspaceAlias}
             onChange={(e) => setWorkspaceAlias(e.target.value)}
@@ -288,28 +297,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
               <Controls />
             </ReactFlow>
           </div>
-          <div className="flex justify-between items-center mt-8 mb-6">
-            <h1 className="text-2xl font-['Gaegu'] text-orange-700">Code Diagram</h1>
-            <button
-              onClick={() => setIsChatOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors font-['Gaegu'] text-lg shadow-sm hover:shadow-md border border-orange-700"
-            >
-              Ask AI
-              <FaComments className="w-5 h-5" />
-            </button>
-          </div>
         </div>
       </div>
-      <WalkthroughModal
-        isOpen={isWalkthroughOpen}
-        onOpenChange={setIsWalkthroughOpen}
-      />
-      <ChatModal
-        isOpen={isChatOpen}
-        onOpenChange={setIsChatOpen}
-      />
+      <WalkthroughModal isOpen={isWalkthroughOpen} onOpenChange={setIsWalkthroughOpen} />
+      <ChatModal isOpen={isChatOpen} onOpenChange={setIsChatOpen} />
     </div>
-  )
-}
+  );
+};
 
-export default Workspace
+export default Workspace;
