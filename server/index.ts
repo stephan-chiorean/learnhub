@@ -266,6 +266,80 @@ app.post('/api/chat', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/plan
+app.post('/api/plan', async (req: Request, res: Response) => {
+  try {
+    const { namespace } = req.body;
+    if (!namespace) {
+      return res.status(400).json({ error: 'Namespace is required' });
+    }
+    if (!process.env.PINECONE_API_KEY || !process.env.PINECONE_INDEX) {
+      return res.status(500).json({ error: 'Pinecone configuration is missing' });
+    }
+
+    // Fetch all files in the namespace from Pinecone
+    const pinecone = new Pinecone({
+      apiKey: process.env.PINECONE_API_KEY,
+      controllerHostUrl: 'https://api.pinecone.io'
+    });
+    const index = pinecone.index(process.env.PINECONE_INDEX);
+    // Use a dummy vector and large topK to fetch everything
+    const queryResponse = await index.namespace(namespace).query({
+      vector: Array(1536).fill(0), // dummy vector for ada-002
+      topK: 1000,
+      includeMetadata: true,
+      includeValues: false
+    });
+
+    // Format file paths for the prompt
+    const files = queryResponse.matches
+      .filter(match => match.metadata && typeof match.metadata.filePath === 'string')
+      .map(match => `File: ${match.metadata!.filePath}`);
+    const fileList = files.join('\n');
+
+    // Create the prompt
+    const prompt = `Given the following list of files in a codebase, group them into logical sections for a code walkthrough course. For each section, list the relevant files. Respond ONLY with a JSON array in this format: [ { "section": "Section Title", "files": ["file1.ts", "file2.ts"] } ]\n\n${fileList}`;
+
+    // Send to OpenAI
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert course planner. Only output valid JSON as described.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.2,
+      max_tokens: 800
+    });
+
+    let plan = completion.choices[0]?.message?.content?.trim();
+    if (!plan) {
+      return res.status(500).json({ error: 'Failed to generate plan' });
+    }
+    // Try to parse the JSON
+    try {
+      plan = JSON.parse(plan);
+    } catch (e) {
+      // Try to fix common issues (e.g., code block wrappers)
+      plan = (plan || '').replace(/^[^\[]*(\[[\s\S]*\])[^[\]]*$/m, '$1');
+      try {
+        plan = JSON.parse(plan);
+      } catch (e2) {
+        return res.status(500).json({ error: 'Failed to parse plan JSON', raw: completion.choices[0]?.message?.content });
+      }
+    }
+    res.json({ plan });
+  } catch (error) {
+    console.error('Error in plan endpoint:', error);
+    res.status(500).json({ error: 'Failed to generate plan' });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
