@@ -16,10 +16,15 @@ import ReactFlow, {
 import { RiSparklingLine, RiShareLine } from 'react-icons/ri'
 import { PiNotePencilBold } from 'react-icons/pi'
 import { FaComments } from 'react-icons/fa'
+import Lottie from 'lottie-react'
 import 'reactflow/dist/style.css'
 import { WalkthroughModal } from './ui/walkthrough'
 import ChatModal from './ChatModal'
 import { getFileIcon, getFileColor } from '../utils/fileIcons'
+import AtomLoader from '../../assets/AtomLoader.json'
+import EqualizerLoader from '../../assets/EqualizerLoader.json'
+import ClockLoading from '../../assets/ClockLoading.json'
+import LoadingRings from '../../assets/LoadingRings.json'
 
 interface WorkspaceProps {
   isSidebarOpen: boolean
@@ -240,7 +245,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
     }
   }, [toggleFolder, owner, repo, navigate]);
 
-  if (isLoading) return <div className={`flex-1 overflow-auto ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>Loading...</div>;
+  if (isLoading) {
+    return (
+      <div className={`flex-1 overflow-auto pt-14 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
+        <div className="flex flex-col items-center justify-center h-full">
+          <div className="w-64 h-64">
+            <Lottie animationData={ClockLoading} loop={true} />
+          </div>
+          <h2 className="text-3xl font-['Gaegu'] text-orange-700 mt-4">Setting up your Workspace</h2>
+        </div>
+      </div>
+    );
+  }
+
   if (error) return <div className={`flex-1 overflow-auto ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>{error}</div>;
 
   return (
