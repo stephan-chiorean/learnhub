@@ -317,7 +317,7 @@ app.post('/api/plan', async (req: Request, res: Response) => {
     
     For each domain, provide:
     - "section": The name of the domain
-    - "description": An array of 3-5 well-written and natural sounding bullet points, written as if an experienced engineer is explaining the system to a peer. Avoid repetitive or robotic phrasing like "This part of the codebase" or "It is responsible for." Instead, explain clearly and conversationally what this part does, how it fits into the system, and why it matters. Include helpful details and insights, but write in a natural and readable style. Consider the following:
+    - “description”: An array of 3-5 well-written and natural sounding bullet points, written as if an experienced engineer is explaining the system to a peer. Avoid repetitive or generic phrasing like “This part of the codebase” or “It is responsible for.” Instead, be specific about the kind of logic, operations, and decision-making that happen in this domain. Focus on helping the reader understand what kinds of tasks are performed, what is important or nuanced about this domain, and how it interacts with other parts of the system. Assume the reader is a new engineer joining the project and needs to understand how to work with this part of the codebase effectively.
       - What this part of the codebase does
       - How it fits into the overall system
       - What responsibilities or roles it plays in the application architecture

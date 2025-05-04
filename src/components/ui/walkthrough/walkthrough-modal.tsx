@@ -4,6 +4,7 @@ import { SiOpenai } from 'react-icons/si'
 import { Lightbulb, BookOpen, Brain, StickyNote, GitBranch } from 'lucide-react'
 import { MultiStepModal } from './multi-step-modal'
 import { useWorkspace } from '../../../context/WorkspaceContext'
+import { useNavigate, useParams } from 'react-router-dom';
 
 interface WalkthroughModalProps {
   isOpen: boolean
@@ -16,9 +17,11 @@ const WalkthroughModal: React.FC<WalkthroughModalProps> = ({
 }) => {
   const [showMultiStep, setShowMultiStep] = useState(false);
   const { namespace } = useWorkspace();
+  const navigate = useNavigate();
+  const { owner, repo } = useParams<{ owner: string; repo: string }>();
 
   const handleStartWalkthrough = () => {
-    setShowMultiStep(true);
+    navigate(`/walkthrough/${owner}/${repo}`);
   };
 
   const handleMultiStepSubmit = (data: any) => {
@@ -130,7 +133,7 @@ const WalkthroughModal: React.FC<WalkthroughModalProps> = ({
             onClick={handleStartWalkthrough}
             className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg"
           >
-            Start Walkthrough
+            Generate
           </button>
         </div>
       </DialogContent>
