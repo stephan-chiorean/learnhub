@@ -39,6 +39,7 @@ const CodeViewer: React.FC = () => {
   const [loadingDots, setLoadingDots] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isNotepadOpen, setIsNotepadOpen] = useState(false)
+  const notepadRef = useRef<HTMLDivElement>(null)
 
   interface SummaryJSON {
     title: string
@@ -49,6 +50,11 @@ const CodeViewer: React.FC = () => {
     }[]
     overallStructure: string
   }
+
+  useEffect(() => {
+    console.log('Current path:', path);
+    console.log('Current file path:', currentFile?.path);
+  }, [path, currentFile]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -65,6 +71,22 @@ const CodeViewer: React.FC = () => {
       if (interval) clearInterval(interval);
     };
   }, [aiSummary]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const notepadButton = document.querySelector('[aria-label="Open Notepad"]');
+      if (notepadRef.current && 
+          !notepadRef.current.contains(event.target as Node) && 
+          !(notepadButton && notepadButton.contains(event.target as Node))) {
+        setIsNotepadOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   React.useEffect(() => {
     if (owner && repo && path) {
@@ -111,20 +133,38 @@ const CodeViewer: React.FC = () => {
 
   const handleSaveAnnotation = (data: any) => {
     if (!selection) return;
-    if (editingNote) {
-      // Update existing note
-      setNotes(prev => prev.map(note => 
-        note.id === editingNote.id ? { ...data, id: note.id } : note
-      ));
-      setEditingNote(null);
-    } else {
-      // Create new note
-      setNotes(prev => [
-        { ...data, id: `${Date.now()}-note` },
-        ...prev
-      ]);
-    }
-  }
+    
+    console.log('Saving annotation with data:', data);
+    console.log('Current selection:', selection);
+    
+    const newNote = {
+      id: `${Date.now()}-note`,
+      content: data.content,
+      startLine: selection.startLine,
+      endLine: selection.endLine,
+      filePath: selection.filePath,
+      tags: data.tags || [],
+      isSummary: false,
+      isSnippet: true
+    };
+
+    console.log('New note to be added:', newNote);
+    
+    setSnippets(prev => {
+      const updatedNotes = [newNote, ...prev];
+      console.log('Updated notes array:', updatedNotes);
+      return updatedNotes;
+    });
+    
+    setIsModalOpen(false);
+    setSelection(null);
+    setIsNotepadOpen(true);
+  };
+
+  // Add useEffect to monitor notes state
+  useEffect(() => {
+    console.log('Current notes state:', notes);
+  }, [notes]);
 
   const handleJumpTo = (filePath: string, startLine: number) => {
     navigate(`/workspace/${owner}/${repo}/file?path=${encodeURIComponent(filePath)}#L${startLine}`)
@@ -296,6 +336,10 @@ const CodeViewer: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    console.log('Rendering Notepad with notes:', notes);
+  }, [notes]);
+
   if (isLoading) {
     return (
       <div className="flex-1 overflow-auto p-6">
@@ -402,7 +446,11 @@ const CodeViewer: React.FC = () => {
           <div className="flex items-center mb-4">
             <h2 className="text-lg font-semibold">{currentFile?.path}</h2>
           </div>
-          <div className="bg-white rounded-lg shadow p-4 relative">
+          <div 
+            className="bg-white rounded-lg shadow p-4 relative"
+            onMouseUp={handleTextSelection}
+            ref={codeRef}
+          >
             <ScrollArea className="w-full overflow-x-auto">
               <SyntaxHighlighter
                 language={getLanguageFromPath(currentFile?.path || '')}
@@ -436,15 +484,21 @@ const CodeViewer: React.FC = () => {
           </div>
         </div>
       </div>
-      <div className={`fixed right-0 top-14 bottom-0 w-80 bg-white border-l border-gray-100 shadow-lg transform transition-transform duration-300 ease-in-out ${isNotepadOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div 
+        ref={notepadRef}
+        className={`fixed right-0 top-14 bottom-0 bg-white border-l border-gray-100 shadow-lg transition-all duration-300 ease-in-out transform ${isNotepadOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        style={{ width: '800px' }}
+      >
         <Notepad
           notes={notes}
           snippets={snippets}
-          currentFilePath={path || ''}
+          currentFilePath={currentFile?.path || path || ''}
           onAnnotationClick={handleAnnotationClick}
           onEditNote={handleEditNote}
           onDeleteNote={handleDeleteNote}
           onSummaryClick={handleSummaryClick}
+          isExpanded={isNotepadOpen}
+          onExpandChange={setIsNotepadOpen}
         />
       </div>
       <AnnotationModal
