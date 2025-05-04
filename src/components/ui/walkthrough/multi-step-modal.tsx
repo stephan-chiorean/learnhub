@@ -18,12 +18,14 @@ interface WalkthroughFormData {
   depth: WalkthroughDepth;
   context: string;
   outputFormat: OutputFormat;
+  namespace: string;
 }
 
 interface MultiStepModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: WalkthroughFormData) => void;
+  namespace: string;
 }
 
 const steps = [
@@ -63,6 +65,7 @@ export const MultiStepModal: React.FC<MultiStepModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  namespace,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<WalkthroughFormData>({
@@ -71,6 +74,7 @@ export const MultiStepModal: React.FC<MultiStepModalProps> = ({
     depth: 'mid',
     context: '',
     outputFormat: 'narrative',
+    namespace: namespace,
   });
 
   const handleNext = () => {

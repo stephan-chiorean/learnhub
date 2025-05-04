@@ -326,7 +326,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
           </div>
         </div>
       </div>
-      <WalkthroughModal isOpen={isWalkthroughOpen} onOpenChange={setIsWalkthroughOpen} />
+      <WalkthroughModal 
+        isOpen={isWalkthroughOpen} 
+        onOpenChange={setIsWalkthroughOpen}
+      />
       <ChatModal isOpen={isChatOpen} onOpenChange={setIsChatOpen} />
     </div>
   );

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { SiOpenai } from 'react-icons/si'
 import { Lightbulb, BookOpen, Brain, StickyNote, GitBranch } from 'lucide-react'
 import { MultiStepModal } from './multi-step-modal'
+import { useWorkspace } from '../../../context/WorkspaceContext'
 
 interface WalkthroughModalProps {
   isOpen: boolean
@@ -14,6 +15,7 @@ const WalkthroughModal: React.FC<WalkthroughModalProps> = ({
   onOpenChange,
 }) => {
   const [showMultiStep, setShowMultiStep] = useState(false);
+  const { namespace } = useWorkspace();
 
   const handleStartWalkthrough = () => {
     setShowMultiStep(true);
@@ -33,6 +35,7 @@ const WalkthroughModal: React.FC<WalkthroughModalProps> = ({
           onOpenChange(false);
         }}
         onSubmit={handleMultiStepSubmit}
+        namespace={namespace || ''}
       />
     );
   }

@@ -21,10 +21,12 @@ interface WorkspaceContextType {
   annotations: Annotation[];
   isLoading: boolean;
   error: string | null;
+  namespace: string | null;
   fetchDirectoryTree: (owner: string, repo: string) => Promise<void>;
   fetchFileContent: (owner: string, repo: string, path: string) => Promise<void>;
   addAnnotation: (annotation: Omit<Annotation, 'id'>) => void;
   removeAnnotation: (id: string) => void;
+  setNamespace: (namespace: string) => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
@@ -35,6 +37,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [namespace, setNamespaceState] = useState<string | null>(null);
 
   const fetchDirectoryTree = async (owner: string, repo: string) => {
     setIsLoading(true);
@@ -46,6 +49,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
         repo
       });
       setDirectoryTree(response.data.directoryTree);
+      setNamespaceState(`${owner}_${repo}`);
     } catch (err) {
       setError('Failed to fetch directory tree');
       console.error(err);
@@ -85,6 +89,10 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     setAnnotations(prev => prev.filter(annotation => annotation.id !== id));
   };
 
+  const setNamespace = (namespace: string) => {
+    setNamespaceState(namespace);
+  };
+
   return (
     <WorkspaceContext.Provider value={{
       directoryTree,
@@ -92,10 +100,12 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
       annotations,
       isLoading,
       error,
+      namespace,
       fetchDirectoryTree,
       fetchFileContent,
       addAnnotation,
-      removeAnnotation
+      removeAnnotation,
+      setNamespace
     }}>
       {children}
     </WorkspaceContext.Provider>
