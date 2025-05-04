@@ -7,9 +7,11 @@ import AnnotationModal from './AnnotationModal'
 import Notepad from './Notepad'
 import { Copy, Check } from 'lucide-react'
 import { SiOpenai } from 'react-icons/si'
+import { PiNotePencilBold } from 'react-icons/pi'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 import AISummaryModal from './AISummaryModal'
 import { getLanguageFromPath } from '../utils/languageDetector'
+import { ScrollArea } from './ui/scroll-area'
 
 const CodeViewer: React.FC = () => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -36,6 +38,7 @@ const CodeViewer: React.FC = () => {
   const [aiSummary, setAISummary] = useState<string | SummaryJSON>('')
   const [loadingDots, setLoadingDots] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isNotepadOpen, setIsNotepadOpen] = useState(false)
 
   interface SummaryJSON {
     title: string
@@ -352,53 +355,59 @@ const CodeViewer: React.FC = () => {
                 {owner}/{repo}
               </h1>
             </div>
-          </div>
-          <div className="grid grid-cols-[auto_400px] gap-4">
-            <div className="flex items-center">
-              <h2 className="text-lg font-semibold">{currentFile?.path}</h2>
+            <div className="flex items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setIsNotepadOpen(!isNotepadOpen)}
+                      className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                    >
+                      <PiNotePencilBold className="w-5 h-5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Open Notepad</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={handleAISummary}
+                      className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                    >
+                      <SiOpenai className="w-5 h-5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Generate an AI Summary</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <button
+                onClick={handleCopyFile}
+                className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                title="Copy file"
+              >
+                {isCopying ? (
+                  <Check className="w-5 h-5 text-green-600" />
+                ) : (
+                  <Copy className="w-5 h-5" />
+                )}
+              </button>
             </div>
-            <div className="flex items-center">
-              <h3 className="text-2xl font-['Gaegu'] text-orange-700">Notepad</h3>
-            </div>
           </div>
-          <div className="grid grid-cols-[auto_400px] gap-4 mt-4">
-            <div 
-              className="bg-white rounded-lg shadow p-4 relative"
-              onMouseUp={handleTextSelection}
-              ref={codeRef}
-            >
-              <div className="absolute top-2 right-2 flex gap-2 z-10">
-                <button
-                  onClick={handleCopyFile}
-                  className="p-2 hover:bg-gray-100 rounded transition-colors bg-white shadow-sm"
-                  title="Copy file"
-                >
-                  {isCopying ? (
-                    <Check className="w-5 h-5 text-green-600" />
-                  ) : (
-                    <Copy className="w-5 h-5 text-gray-500" />
-                  )}
-                </button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={handleAISummary}
-                        className="p-2 hover:bg-orange-50 rounded transition-colors bg-white shadow-sm"
-                      >
-                        <SiOpenai className="w-5 h-5 text-orange-500" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Generate an AI Summary</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+          <div className="flex items-center mb-4">
+            <h2 className="text-lg font-semibold">{currentFile?.path}</h2>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4 relative">
+            <ScrollArea className="w-full overflow-x-auto">
               <SyntaxHighlighter
                 language={getLanguageFromPath(currentFile?.path || '')}
                 style={docco}
-                customStyle={{ margin: 0, padding: '1rem' }}
+                customStyle={{ margin: 0, padding: '1rem', minWidth: 'fit-content' }}
                 showLineNumbers
                 wrapLines
                 lineProps={(lineNumber) => {
@@ -423,18 +432,20 @@ const CodeViewer: React.FC = () => {
               >
                 {currentFile?.content || ''}
               </SyntaxHighlighter>
-            </div>
-            <Notepad
-              notes={notes}
-              snippets={snippets}
-              currentFilePath={path || ''}
-              onAnnotationClick={handleAnnotationClick}
-              onEditNote={handleEditNote}
-              onDeleteNote={handleDeleteNote}
-              onSummaryClick={handleSummaryClick}
-            />
+            </ScrollArea>
           </div>
         </div>
+      </div>
+      <div className={`fixed right-0 top-14 bottom-0 w-80 bg-white border-l border-gray-100 shadow-lg transform transition-transform duration-300 ease-in-out ${isNotepadOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <Notepad
+          notes={notes}
+          snippets={snippets}
+          currentFilePath={path || ''}
+          onAnnotationClick={handleAnnotationClick}
+          onEditNote={handleEditNote}
+          onDeleteNote={handleDeleteNote}
+          onSummaryClick={handleSummaryClick}
+        />
       </div>
       <AnnotationModal
         isOpen={isModalOpen}
