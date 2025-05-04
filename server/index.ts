@@ -298,48 +298,48 @@ app.post('/api/plan', async (req: Request, res: Response) => {
       .map(match => `File: ${match.metadata!.filePath}`);
     const fileList = files.join('\n');
 
-    const prompt = `Given the following list of files in a codebase, create a structured walkthrough plan grouped into logical implementation domains based on how the project works. 
+    const prompt = `Given the following list of files in a codebase, create a structured walkthrough plan grouped into logical implementation domains based on how the project works.
 
-The groupings should reflect responsibilities and functionality, NOT folders or filenames. Domains may include things like Authentication, Repository Indexing, Context Injection, AI Interfaces, Integrations, UI Views, Utility Functions, Infrastructure, and Tests, but the exact domains should be determined based on the shape of the project.
-
-The walkthrough plan should be dynamic and adapt based on the project. If certain domains are not present (such as Authentication or Database layers), omit them. Only include domains that are relevant for this project.
-
-Order the sections to reflect the natural flow for someone learning and exploring the codebase. In general, the flow should be:
-- Start with server entrypoints and initialization logic (if present)
-- Move to API and integration layers
-- Proceed to internal and shared logic
-- Cover data access and domain logic (if applicable)
-- Move into frontend entrypoints and major views/screens
-- UI components should be limited to only major components or views that represent key parts of the user interface. Do NOT include small, reusable UI components (such as generic buttons, inputs, or utility elements) at this stage. These will be covered later during section deep dives.
-- Finish with infrastructure, tooling, and tests (if present)
-
-Think of this plan as setting up "Checkpoints" — a high-level overview of the major domains and logical flow of the project, without going into deep detail yet. Detailed steps and breakdowns will happen later within each section.
-
-For each domain, provide:
-- "section": The name of the domain
-- "description": A detailed description of what this part of the codebase is responsible for and why it exists
-- "files": The relevant file paths
-- "linkPrevious": A short narrative explanation of how this section connects from the previous section (or null if first)
-- "linkNext": A short narrative explanation of where the next section will go and why (or null if last)
-
-The linkPrevious and linkNext fields should help guide a reader naturally from one domain to the next, creating a connected narrative across the walkthrough.
-
-Respond ONLY with a JSON array in this format:
-
-[
-  {
-    "section": "Section Title",
-    "description": "Detailed description of the implementation domain",
-    "files": ["file1.ts", "file2.ts"],
-    "linkPrevious": "Explanation of how this connects from the previous section",
-    "linkNext": "Explanation of how this leads to the next section"
-  },
-  ...
-]
-
-Here are the files:
-
-${fileList}`
+    The groupings should reflect responsibilities and functionality, NOT folders or filenames. Domains may include things like Authentication, Repository Indexing, Context Injection, AI Interfaces, Integrations, UI Views, Utility Functions, Infrastructure, and Tests, but the exact domains should be determined based on the shape of the project.
+    
+    The walkthrough plan should be dynamic and adapt based on the project. If certain domains are not present (such as Authentication or Database layers), omit them. Only include domains that are actually represented in the provided file list. If no releveant files exist for a domain, do not create a section for it at all.
+    
+    Order the sections to reflect the natural flow for someone learning and exploring the codebase. In general, the flow should be:
+    - Start with server entrypoints and initialization logic (if present)
+    - Move to API and integration layers
+    - Proceed to internal and shared logic
+    - Cover data access and domain logic (if applicable)
+    - Move into frontend entrypoints and major views/screens
+    - UI components should be limited to only major components or views that represent key parts of the user interface. Do NOT include small, reusable UI components (such as generic buttons, inputs, or utility elements) at this stage. These will be covered later during section deep dives.
+    - Finish with infrastructure, tooling, and tests (if present)
+    
+    Think of this plan as setting up "Checkpoints" — a high-level overview of the major domains and logical flow of the project, without going into deep detail yet. Detailed steps and breakdowns will happen later within each section.
+    
+    For each domain, provide:
+    - "section": The name of the domain
+    - "description": An array of 3-5 well-written and natural sounding bullet points, written as if an experienced engineer is explaining the system to a peer. Avoid repetitive or robotic phrasing like "This part of the codebase" or "It is responsible for." Instead, explain clearly and conversationally what this part does, how it fits into the system, and why it matters. Include helpful details and insights, but write in a natural and readable style. Consider the following:
+      - What this part of the codebase does
+      - How it fits into the overall system
+      - What responsibilities or roles it plays in the application architecture
+      - Any key interactions with other parts of the system
+    - "files": The relevant file paths
+    
+    When creating the plan, think carefully about how each section flows into the next. Consider how a reader would naturally progress from one domain to another to understand the codebase. However, do NOT include linkPrevious or linkNext in the output. These should only inform your internal reasoning to order and connect the sections in a meaningful and natural way.
+    
+    Respond ONLY with a JSON array in this format:
+    
+    [
+      {
+        "section": "Section Title",
+        "description": ["Detailed bullet point 1", "Detailed bullet point 2", "Detailed bullet point 3"],
+        "files": ["file1.ts", "file2.ts"]
+      },
+      ...
+    ]
+    
+    Here are the files:
+    
+    ${fileList}`
 
     // Send to OpenAI
     const completion = await openai.chat.completions.create({

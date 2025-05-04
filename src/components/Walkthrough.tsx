@@ -9,10 +9,8 @@ import { Button } from './ui/button';
 
 interface Section {
   section: string;
-  description: string;
+  description: string[];
   files: string[];
-  linkPrevious: string | null;
-  linkNext: string | null;
 }
 
 const Walkthrough: React.FC = () => {
@@ -117,19 +115,11 @@ const Walkthrough: React.FC = () => {
                   {section.section}
                 </h2>
               </div>
-              <p className="text-gray-700 mb-4">
-                {section.description}
-              </p>
-              {section.linkPrevious && (
-                <p className="text-sm text-gray-500 italic mb-2">
-                  Connects from: {section.linkPrevious}
-                </p>
-              )}
-              {section.linkNext && (
-                <p className="text-sm text-gray-500 italic">
-                  Leads to: {section.linkNext}
-                </p>
-              )}
+              <ul className="list-disc list-inside text-gray-700 mb-4 space-y-2">
+                {section.description.map((point, pointIndex) => (
+                  <li key={pointIndex}>{point}</li>
+                ))}
+              </ul>
               <div className="mt-4">
                 <h3 className="text-lg font-['Gaegu'] text-black mb-2">
                   Key Files:
