@@ -270,6 +270,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
 app.post('/api/plan', async (req: Request, res: Response) => {
   try {
     const { namespace } = req.body;
+    console.log(`✅ Generating plan for: ${namespace}`);
     if (!namespace) {
       return res.status(400).json({ error: 'Namespace is required' });
     }
@@ -346,7 +347,7 @@ ${fileList}`
       messages: [
         {
           role: 'system',
-          content: 'You are an expert course planner. Only output valid JSON as described.'
+          content: 'You are an expert course planner. Only output valid JSON as described. Make sure the JSON is complete and properly formatted.'
         },
         {
           role: 'user',
@@ -354,13 +355,14 @@ ${fileList}`
         }
       ],
       temperature: 0.2,
-      max_tokens: 800
+      max_tokens: 2000
     });
 
     let plan = completion.choices[0]?.message?.content?.trim();
     if (!plan) {
       return res.status(500).json({ error: 'Failed to generate plan' });
     }
+
     // Try to parse the JSON
     try {
       plan = JSON.parse(plan);
@@ -370,9 +372,11 @@ ${fileList}`
       try {
         plan = JSON.parse(plan);
       } catch (e2) {
-        return res.status(500).json({ error: 'Failed to parse plan JSON', raw: completion.choices[0]?.message?.content });
+        console.error('Failed to parse plan JSON:', plan);
+        return res.status(500).json({ error: 'Failed to parse plan JSON', raw: plan });
       }
     }
+
     res.json({ plan });
   } catch (error) {
     console.error('Error in plan endpoint:', error);

@@ -6,6 +6,7 @@ import { Label } from '../label';
 import { Textarea } from '../textarea';
 import { cn } from '../../../lib/utils';
 import { SiOpenai } from 'react-icons/si';
+import { useNavigate, useParams } from 'react-router-dom';
 
 export type WalkthroughType = 'learning' | 'feature' | 'bug' | 'custom';
 export type WalkthroughScope = 'whole' | 'folder' | 'file';
@@ -76,6 +77,8 @@ export const MultiStepModal: React.FC<MultiStepModalProps> = ({
     outputFormat: 'narrative',
     namespace: namespace,
   });
+  const navigate = useNavigate();
+  const { owner, repo } = useParams<{ owner: string; repo: string }>();
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -91,6 +94,7 @@ export const MultiStepModal: React.FC<MultiStepModalProps> = ({
 
   const handleSubmit = () => {
     onSubmit(formData);
+    navigate(`/walkthrough/${owner}/${repo}`);
     onClose();
   };
 
