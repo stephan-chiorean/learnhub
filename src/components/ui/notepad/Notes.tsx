@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import BulletList from '@tiptap/extension-bullet-list';
+import OrderedList from '@tiptap/extension-ordered-list';
+import CodeBlock from '@tiptap/extension-code-block';
+import Blockquote from '@tiptap/extension-blockquote';
+import Heading from '@tiptap/extension-heading';
 import { 
   Bold, 
   Italic, 
@@ -25,12 +30,41 @@ const Notes: React.FC<NotesProps> = ({ isExpanded }) => {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: {
-          levels: [1, 2],
-        },
-      }),
+        heading: false,
+        bulletList: false,
+        orderedList: false,
+        codeBlock: false,
+        blockquote: false,
+        }),
+      Heading.configure({
+        levels: [1, 2],
+         HTMLAttributes: {
+            1: { class: 'text-2xl font-bold' },
+            2: { class: 'text-xl font-bold' }
+          }
+        }),
       Placeholder.configure({
         placeholder: 'Start typing your notes...',
+      }),
+      BulletList.configure({
+        HTMLAttributes: {
+          class: 'list-disc pl-4',
+        },
+      }),
+      OrderedList.configure({
+        HTMLAttributes: {
+          class: 'list-decimal pl-4',
+        },
+      }),
+      CodeBlock.configure({
+        HTMLAttributes: {
+          class: 'bg-gray-100 p-2 rounded-md',
+        },
+      }),
+      Blockquote.configure({
+        HTMLAttributes: {
+          class: 'border-l-2 border-gray-300 pl-4 italic',
+        },
       }),
     ],
     content: '',
@@ -40,11 +74,37 @@ const Notes: React.FC<NotesProps> = ({ isExpanded }) => {
       attributes: {
         class: 'font-["Gaegu"] text-lg min-h-[calc(100vh-8rem)] focus:outline-none',
       },
+      handleKeyDown: (view, event): boolean => {
+        if (event.key === 'Tab') {
+          event.preventDefault();
+      
+          if (!editor) return false;
+      
+          const isInList = editor.isActive('bulletList') || editor.isActive('orderedList');
+      
+          if (isInList) {
+            if (event.shiftKey) {
+              // Shift+Tab: outdent
+              return editor.chain().focus().liftListItem('listItem').run();
+            } else {
+              // Tab: indent
+              return editor.chain().focus().sinkListItem('listItem').run();
+            }
+          } else {
+            // Not in list → insert tab character
+            return editor.chain().focus().insertContent('\t').run();
+          }
+        }
+      
+        return false;
+      },
     },
   });
 
   if (!editor) {
     return null;
+  } else {
+    console.log("HEADER", editor.getAttributes('heading'));
   }
 
   const MenuBar = () => {

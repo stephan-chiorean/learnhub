@@ -24,8 +24,6 @@ interface NotepadProps {
   onEditNote: (annotation: Annotation) => void;
   onDeleteNote: (annotation: Annotation) => void;
   onSummaryClick?: (summary: string) => void;
-  isExpanded: boolean;
-  onExpandChange: (expanded: boolean) => void;
 }
 
 const Notepad: React.FC<NotepadProps> = ({
@@ -35,12 +33,11 @@ const Notepad: React.FC<NotepadProps> = ({
   onAnnotationClick,
   onEditNote,
   onDeleteNote,
-  onSummaryClick,
-  isExpanded,
-  onExpandChange,
+  onSummaryClick
 }) => {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [view, setView] = useState<'notes' | 'snippets'>('snippets');
+  const [view, setView] = useState<'notes' | 'snippets'>('notes');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const viewOptions = [
     { label: 'Notes', value: 'notes' },
@@ -48,11 +45,15 @@ const Notepad: React.FC<NotepadProps> = ({
   ];
 
   return (
-    <div className={`h-full bg-white border-l border-gray-100 shadow-lg transition-all duration-300 w-[800px]`}>
+    <div
+      className={`h-full bg-white border-l border-gray-100 shadow-lg transition-all duration-300 ${
+        isExpanded ? 'w-screen max-w-full' : 'w-[800px]'
+      }`}
+    >
       <div className="flex items-center justify-between p-4 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => onExpandChange(!isExpanded)}
+            onClick={() => setIsExpanded(!isExpanded)}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             {isExpanded ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}

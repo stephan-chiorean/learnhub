@@ -147,8 +147,6 @@ const CodeViewer: React.FC = () => {
       isSummary: false,
       isSnippet: true
     };
-
-    console.log('New note to be added:', newNote);
     
     setSnippets(prev => {
       const updatedNotes = [newNote, ...prev];
@@ -487,7 +485,6 @@ const CodeViewer: React.FC = () => {
       <div 
         ref={notepadRef}
         className={`fixed right-0 top-14 bottom-0 bg-white border-l border-gray-100 shadow-lg transition-all duration-300 ease-in-out transform ${isNotepadOpen ? 'translate-x-0' : 'translate-x-full'}`}
-        style={{ width: '800px' }}
       >
         <Notepad
           notes={notes}
@@ -497,8 +494,6 @@ const CodeViewer: React.FC = () => {
           onEditNote={handleEditNote}
           onDeleteNote={handleDeleteNote}
           onSummaryClick={handleSummaryClick}
-          isExpanded={isNotepadOpen}
-          onExpandChange={setIsNotepadOpen}
         />
       </div>
       <AnnotationModal

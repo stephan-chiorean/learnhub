@@ -50,7 +50,7 @@ const Snippets: React.FC<SnippetsProps> = ({
         {filteredNotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[calc(100vh-8rem)] text-gray-400">
             <div className="text-4xl mb-4">📝</div>
-            <p className="font-['Gaegu'] text-lg">Start by highlighting the code to add to your notepad</p>
+            <p className="font-['Gaegu'] text-lg">Start by highlighting the code to add snippets to your notepad</p>
           </div>
         ) : (
           filteredNotes
