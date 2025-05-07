@@ -29,6 +29,26 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Add these type definitions before the endpoint
+interface LessonStep {
+  title: string;
+  filePath: string | null;
+  startLine: number | null;
+  endLine: number | null;
+  code: string | null;
+  explanation: string;
+}
+
+interface Lesson {
+  title: string;
+  steps: LessonStep[];
+}
+
+interface LessonPlan {
+  sectionId: string;
+  lessons: Lesson[];
+}
+
 // POST /api/createWorkspace
 app.post('/api/createWorkspace', async (req: Request, res: Response) => {
   try {
@@ -317,7 +337,7 @@ app.post('/api/plan', async (req: Request, res: Response) => {
     
     For each domain, provide:
     - "section": The name of the domain
-    - “description”: An array of 3-5 well-written and natural sounding bullet points, written as if an experienced engineer is explaining the system to a peer. Avoid repetitive or generic phrasing like “This part of the codebase” or “It is responsible for.” Instead, be specific about the kind of logic, operations, and decision-making that happen in this domain. Focus on helping the reader understand what kinds of tasks are performed, what is important or nuanced about this domain, and how it interacts with other parts of the system. Assume the reader is a new engineer joining the project and needs to understand how to work with this part of the codebase effectively.
+    - "description": An array of 3-5 well-written and natural sounding bullet points, written as if an experienced engineer is explaining the system to a peer. Avoid repetitive or generic phrasing like "This part of the codebase" or "It is responsible for." Instead, be specific about the kind of logic, operations, and decision-making that happen in this domain. Focus on helping the reader understand what kinds of tasks are performed, what is important or nuanced about this domain, and how it interacts with other parts of the system. Assume the reader is a new engineer joining the project and needs to understand how to work with this part of the codebase effectively.
       - What this part of the codebase does
       - How it fits into the overall system
       - What responsibilities or roles it plays in the application architecture
@@ -383,6 +403,205 @@ app.post('/api/plan', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to generate plan' });
   }
 });
+
+// POST /api/generateLessonPlan
+app.post('/api/generateLessonPlan', async (req: Request, res: Response) => {
+  try {
+    const { section, sectionId, description, files } = req.body;
+
+    // Validate required fields
+    if (!section || !sectionId || !description || !files) {
+      return res.status(400).json({ 
+        error: 'Missing required fields. Please provide section, sectionId, description, and files' 
+      });
+    }
+
+    // Validate array types
+    if (!Array.isArray(description) || !Array.isArray(files)) {
+      return res.status(400).json({ 
+        error: 'description and files must be arrays' 
+      });
+    }
+
+    // Extract namespace from sectionId (assuming format: owner_repo)
+    const namespace = sectionId.split('_').slice(0, 2).join('_');
+    
+    // Fetch file contents from Pinecone
+    const [owner, repo] = namespace.split('_');
+
+    const fileContents = await Promise.all(
+      files.map(async (filePath) => {
+        const content = await fetchFileContent(owner, repo, filePath);
+        return {
+          path: filePath,
+          content
+        };
+      })
+    );
+
+    // Format file contents for the prompt
+    const formattedFileContents = fileContents
+      .map(file => `File: ${file.path}\nContent:\n${file.content}\n`)
+      .join('\n---\n');
+
+    const prompt = `You are an expert code educator. Given this codebase section and its description and files, create a detailed lesson plan to teach a developer.
+
+Section: ${section}
+Description: ${description.join('\n')}
+Files: ${files.join('\n')}
+
+File Contents:
+${formattedFileContents}
+
+Break this into major lessons. Each lesson should contain multiple step-throughs.
+
+For each step-through, you must include:
+- title: short descriptive title
+- filePath: (string) which file this code snippet is from, or null if no code
+- startLine: (number) the starting line number of the snippet, or null if no code
+- endLine: (number) the ending line number of the snippet, or null if no code
+- code: (optional string) code snippet itself, or null if not applicable
+- explanation: description and explanation of the code or concept
+
+IMPORTANT RULES:
+1. When there is no code snippet for a step, set filePath, startLine, endLine, and code to null
+2. Always include line numbers (startLine and endLine) when referencing code
+3. Make sure line numbers are accurate and match the provided file contents
+4. Keep code snippets focused and relevant to the explanation
+5. Include both conceptual steps (no code) and code-specific steps
+6. Order steps logically to build understanding
+
+Respond with a JSON object in this exact structure:
+{
+  "sectionId": "${sectionId}",
+  "lessons": [
+    {
+      "title": "Lesson title",
+      "steps": [
+        {
+          "title": "Step title",
+          "filePath": "path/to/file.ts",
+          "startLine": 123,
+          "endLine": 130,
+          "code": "The code snippet here",
+          "explanation": "Explanation text"
+        }
+      ]
+    }
+  ]
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert code educator. Your task is to create detailed, accurate lesson plans with precise code references.
+          
+Important guidelines:
+1. Always verify line numbers match the provided file contents
+2. Include both conceptual and code-specific steps
+3. When no code is referenced, set filePath, startLine, endLine, and code to null
+4. Keep code snippets focused and relevant
+5. Order steps logically to build understanding
+6. Only output valid JSON matching the exact structure provided`
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 2000
+    });
+
+    let lessonPlan: LessonPlan | undefined;
+    try {
+      const parsedPlan = JSON.parse(completion.choices[0]?.message?.content?.trim() || '');
+      if (isLessonPlan(parsedPlan)) {
+        lessonPlan = parsedPlan;
+      } else {
+        throw new Error('Invalid lesson plan structure');
+      }
+    } catch (e) {
+      // Try to fix common issues (e.g., code block wrappers)
+      const fixedPlan = (completion.choices[0]?.message?.content?.trim() || '').replace(/^[^\{]*({[\s\S]*})[^\}]*$/m, '$1');
+      try {
+        const parsedPlan = JSON.parse(fixedPlan);
+        if (isLessonPlan(parsedPlan)) {
+          lessonPlan = parsedPlan;
+        } else {
+          throw new Error('Invalid lesson plan structure');
+        }
+      } catch (e2) {
+        console.error('Failed to parse lesson plan JSON:', completion.choices[0]?.message?.content);
+        return res.status(500).json({ error: 'Failed to parse lesson plan JSON', raw: completion.choices[0]?.message?.content });
+      }
+    }
+
+    if (!lessonPlan) {
+      return res.status(500).json({ error: 'Failed to generate lesson plan' });
+    }
+
+    // Validate the structure of the parsed lesson plan
+    if (!lessonPlan.sectionId || !Array.isArray(lessonPlan.lessons)) {
+      return res.status(500).json({ error: 'Invalid lesson plan structure' });
+    }
+
+    // Validate each lesson and step
+    for (const lesson of lessonPlan.lessons) {
+      if (!lesson.title || !Array.isArray(lesson.steps)) {
+        return res.status(500).json({ error: 'Invalid lesson structure' });
+      }
+
+      for (const step of lesson.steps) {
+        if (!step.title || !step.explanation) {
+          return res.status(500).json({ error: 'Invalid step structure' });
+        }
+
+        // Validate code-related fields
+        if (step.filePath !== null) {
+          if (typeof step.startLine !== 'number' || typeof step.endLine !== 'number') {
+            return res.status(500).json({ error: 'Invalid line numbers in step' });
+          }
+        } else {
+          // If no filePath, ensure all code-related fields are null
+          if (step.startLine !== null || step.endLine !== null || step.code !== null) {
+            return res.status(500).json({ error: 'Invalid null code fields in step' });
+          }
+        }
+      }
+    }
+
+    res.json(lessonPlan);
+  } catch (error) {
+    console.error('Error in generateLessonPlan endpoint:', error);
+    res.status(500).json({ error: 'Failed to generate lesson plan' });
+  }
+});
+
+// Add type guard function
+function isLessonPlan(obj: any): obj is LessonPlan {
+  return (
+    obj &&
+    typeof obj.sectionId === 'string' &&
+    Array.isArray(obj.lessons) &&
+    obj.lessons.every((lesson: any) =>
+      lesson &&
+      typeof lesson.title === 'string' &&
+      Array.isArray(lesson.steps) &&
+      lesson.steps.every((step: any) =>
+        step &&
+        typeof step.title === 'string' &&
+        typeof step.explanation === 'string' &&
+        (step.filePath === null || typeof step.filePath === 'string') &&
+        (step.startLine === null || typeof step.startLine === 'number') &&
+        (step.endLine === null || typeof step.endLine === 'number') &&
+        (step.code === null || typeof step.code === 'string')
+      )
+    )
+  );
+}
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
