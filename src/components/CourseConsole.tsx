@@ -191,92 +191,100 @@ const CourseConsole: React.FC = () => {
     <div className="flex h-screen">
       <div className="flex-1 overflow-hidden p-6 pt-10">
         <div className="max-w-[95%] mx-auto h-full">
-          <h1 className="text-4xl font-['Gaegu'] text-black mb-8">
-            Section 1: {currentSection?.section}
-          </h1>
-          {!lessonPlan ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="w-32 h-32">
-                <Lottie animationData={clockLoading} loop />
-              </div>
+          <div className="space-y-8 h-[calc(100vh-4rem)] overflow-y-auto scroll-smooth snap-y snap-mandatory">
+            <div className="snap-start">
+              <h1 className="text-4xl font-['Gaegu'] text-black">
+                Section 1: {currentSection?.section}
+              </h1>
             </div>
-          ) : (
-            <div className="space-y-8 h-[calc(100vh-12rem)] overflow-y-auto">
-              {lessonPlan.lessons.map((lesson, lessonIndex) => (
-                <div key={lessonIndex} className="bg-white rounded-lg shadow-md p-6">
-                  <h2 className="text-3xl font-['Gaegu'] text-orange-700 mb-6">{lesson.title}</h2>
-                  <div className="space-y-8">
-                    {lesson.steps.map((step, stepIndex) => {
-                      const code = getCodeSnippet(step);
-                      const stepId = `${lessonIndex}-${stepIndex}`;
-                      const shouldShowExpand = step.explanation.length > 3;
-                      const isExpanded = expandedExplanations.has(stepId);
-                      
-                      return (
-                        <div key={stepIndex} className="bg-gray-50 rounded-lg p-6 transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-4">
-                              <Checkbox
-                                checked={completedSteps.has(stepId)}
-                                onCheckedChange={() => toggleStep(stepId)}
-                                className="w-6 h-6 border-2 border-orange-500 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400 transition-all duration-200 hover:border-orange-600 hover:data-[state=checked]:bg-green-500 hover:data-[state=checked]:border-green-500"
-                              />
-                              <h3 className="text-xl font-['Gaegu'] text-orange-600">{step.title}</h3>
-                            </div>
-                            {code && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <button
-                                      onClick={() => handleCopyStep(step, stepId)}
-                                      className="flex items-center justify-center w-8 h-8 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
-                                    >
-                                      {copyingStates[stepId] ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                                    </button>
-                                  </TooltipTrigger>
-                                  <TooltipContent><p>Copy Code</p></TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
-                          </div>
-                          {code && (
-                            <div className="mb-4 max-h-[calc(100vh-24rem)] overflow-y-auto">
-                              <CodeBlock
-                                code={code}
-                                language={getLanguageFromPath(step.filePath || '')}
-                                startLine={step.startLine || 1}
-                              />
-                            </div>
-                          )}
-                          <div className="relative">
-                            <div className="text-gray-700 leading-relaxed font-['Gaegu'] text-xl space-y-2 p-4 bg-gray-200 rounded-lg">
-                              {step.explanation.map((exp, i) => (
-                                <li key={i} className={!isExpanded && i >= 3 ? 'hidden' : ''}>
-                                  {exp}
-                                </li>
-                              ))}
-                            </div>
-                            {shouldShowExpand && (
-                              <button
-                                onClick={() => toggleExplanation(stepId)}
-                                className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-300 transition-colors"
-                              >
-                                {isExpanded ? (
-                                  <ChevronUp className="w-5 h-5 text-gray-600" />
-                                ) : (
-                                  <ChevronDown className="w-5 h-5 text-gray-600" />
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+            {!lessonPlan ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="w-32 h-32">
+                  <Lottie animationData={clockLoading} loop />
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {lessonPlan.lessons.map((lesson, lessonIndex) => (
+                  <div key={lessonIndex} className="snap-start pt-4">
+                    <div className="bg-white rounded-lg shadow-md p-6">
+                      <h2 className="text-3xl font-['Gaegu'] text-orange-700">{lesson.title}</h2>
+                      <div className="space-y-4">
+                        {lesson.steps.map((step, stepIndex) => {
+                          const code = getCodeSnippet(step);
+                          const stepId = `${lessonIndex}-${stepIndex}`;
+                          const shouldShowExpand = step.explanation.length > 3;
+                          const isExpanded = expandedExplanations.has(stepId);
+                          
+                          return (
+                            <div key={stepIndex} className="snap-start pt-8">
+                              <div className="bg-gray-50 rounded-lg p-6 transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5">
+                                <div className="flex items-center justify-between mb-4">
+                                  <div className="flex items-center gap-4">
+                                    <Checkbox
+                                      checked={completedSteps.has(stepId)}
+                                      onCheckedChange={() => toggleStep(stepId)}
+                                      className="w-6 h-6 border-2 border-orange-500 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400 transition-all duration-200 hover:border-orange-600 hover:data-[state=checked]:bg-green-500 hover:data-[state=checked]:border-green-500"
+                                    />
+                                    <h3 className="text-xl font-['Gaegu'] text-orange-600">{step.title}</h3>
+                                  </div>
+                                  {code && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button
+                                            onClick={() => handleCopyStep(step, stepId)}
+                                            className="flex items-center justify-center w-8 h-8 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                                          >
+                                            {copyingStates[stepId] ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Copy Code</p></TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </div>
+                                {code && (
+                                  <div className="mb-4 max-h-[calc(100vh-24rem)] overflow-y-auto">
+                                    <CodeBlock
+                                      code={code}
+                                      language={getLanguageFromPath(step.filePath || '')}
+                                      startLine={step.startLine || 1}
+                                    />
+                                  </div>
+                                )}
+                                <div className="relative">
+                                  <div className="text-gray-700 leading-relaxed font-['Gaegu'] text-xl space-y-2 p-4 bg-gray-200 rounded-lg">
+                                    {step.explanation.map((exp, i) => (
+                                      <li key={i} className={!isExpanded && i >= 3 ? 'hidden' : ''}>
+                                        {exp}
+                                      </li>
+                                    ))}
+                                  </div>
+                                  {shouldShowExpand && (
+                                    <button
+                                      onClick={() => toggleExplanation(stepId)}
+                                      className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-300 transition-colors"
+                                    >
+                                      {isExpanded ? (
+                                        <ChevronUp className="w-5 h-5 text-gray-600" />
+                                      ) : (
+                                        <ChevronDown className="w-5 h-5 text-gray-600" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
