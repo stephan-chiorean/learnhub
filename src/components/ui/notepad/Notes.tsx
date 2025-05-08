@@ -103,8 +103,6 @@ const Notes: React.FC<NotesProps> = ({ isExpanded }) => {
 
   if (!editor) {
     return null;
-  } else {
-    console.log("HEADER", editor.getAttributes('heading'));
   }
 
   const MenuBar = () => {

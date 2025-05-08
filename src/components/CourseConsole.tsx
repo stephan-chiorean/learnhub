@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronUp, BookOpen, Share2, BarChart2, Bookmark, MessageSquare, ChevronDown as ChevronDownIcon } from 'lucide-react';
 import { useWalkthrough } from '../context/WalkthroughContext';
-import SyntaxHighlighter from 'react-syntax-highlighter';
-import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { getLanguageFromPath } from '../utils/languageDetector';
-import { ScrollArea } from './ui/scroll-area';
 import { newcourse } from '../lib/mock/newcourse';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { FileContent, useWorkspace } from '../context/WorkspaceContext';
 import Lottie from 'lottie-react';
 import clockLoading from '../../assets/ClockLoading.json';
 import { Checkbox } from './ui/checkbox';
+import { CodeBlock } from './ui/walkthrough/code-block';
+import CourseNotepad from './ui/walkthrough/courseNotebook';
+import { ProgressSlider } from './ui/walkthrough/courseNotebook';
+import ChatModal from './ChatModal';
+import SectionModal from './ui/walkthrough/section-modal';
 
 export interface LessonStep {
   title: string;
@@ -31,37 +33,13 @@ export interface LessonPlan {
   lessons: Lesson[];
 }
 
-// ✅ NEW COMPONENT → Memoized Code Block
-const CodeBlock: React.FC<{
-  code: string;
-  language: string;
-  startLine: number;
-}> = React.memo(({ code, language, startLine }) => {
-  return (
-    <ScrollArea className="w-full overflow-x-auto">
-      <SyntaxHighlighter
-        language={language}
-        style={docco}
-        customStyle={{
-          margin: 0,
-          padding: '1rem',
-          minWidth: 'fit-content',
-          background: '#f8f8f8',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-          fontSize: '14px',
-          lineHeight: '1.5',
-        }}
-        showLineNumbers
-        startingLineNumber={startLine}
-        wrapLines
-        wrapLongLines
-        useInlineStyles
-      >
-        {code}
-      </SyntaxHighlighter>
-    </ScrollArea>
-  );
-}, (prev, next) => prev.code === next.code && prev.language === next.language && prev.startLine === next.startLine);
+interface CourseNote {
+  id: string;
+  content: string;
+  lessonId: string;
+  stepId: string;
+  tags?: string[];
+}
 
 const CourseConsole: React.FC = () => {
   const { owner, repo, section } = useParams<{ owner: string; repo: string; section: string }>();
@@ -75,6 +53,13 @@ const CourseConsole: React.FC = () => {
   const [loadedFiles, setLoadedFiles] = useState<Set<string>>(new Set());
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [expandedExplanations, setExpandedExplanations] = useState<Set<string>>(new Set());
+  const [showNotepad, setShowNotepad] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
+  const [courseNotes, setCourseNotes] = useState<CourseNote[]>([]);
+  const [initialView, setInitialView] = useState<'notes' | 'lessons'>('notes');
+  const [selectedLessonId, setSelectedLessonId] = useState<string>();
+  const [selectedStepId, setSelectedStepId] = useState<string>();
 
   const currentSection = plan.find(s => s.sectionId === section);
   const sectionFilePaths = useMemo(() => new Set(currentSection?.files ?? []), [currentSection]);
@@ -101,12 +86,10 @@ const CourseConsole: React.FC = () => {
 
       for (const filePath of filesToFetch) {
         try {
-          console.log('Fetching file:', filePath);
           const fileContent = await fetchFileContent(owner, repo, filePath);
           if (fileContent) {
             newFileContents[filePath] = fileContent;
             newLoadedFiles.add(filePath);
-            console.log('Successfully loaded file:', filePath);
           }
         } catch (error) {
           console.error(`Failed to fetch content for ${filePath}:`, error);
@@ -177,6 +160,22 @@ const CourseConsole: React.FC = () => {
     });
   };
 
+  const handleEditNote = (note: CourseNote) => {
+    // TODO: Implement note editing
+    console.log('Edit note:', note);
+  };
+
+  const handleDeleteNote = (note: CourseNote) => {
+    setCourseNotes(prev => prev.filter(n => n.id !== note.id));
+  };
+
+  const handleBookmarkClick = (lessonId: string, stepId: string) => {
+    setSelectedLessonId(lessonId);
+    setSelectedStepId(stepId);
+    setInitialView('lessons');
+    setShowNotepad(true);
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -189,104 +188,211 @@ const CourseConsole: React.FC = () => {
 
   return (
     <div className="flex h-screen">
-      <div className="flex-1 overflow-hidden p-6 pt-10">
-        <div className="max-w-[95%] mx-auto h-full">
-          <div className="space-y-8 h-[calc(100vh-4rem)] overflow-y-auto scroll-smooth snap-y snap-mandatory">
-            <div className="snap-start">
-              <h1 className="text-4xl font-['Gaegu'] text-black">
+      <div className="flex-1 overflow-hidden">
+        <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 flex items-center px-4 z-20 shadow-sm">
+          <div className="flex items-center gap-8">
+            <button
+              onClick={() => setIsSectionModalOpen(true)}
+              className="group flex items-center gap-2 hover:bg-orange-50 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <h1 className="text-2xl font-['Gaegu'] text-black group-hover:text-orange-700">
                 Section 1: {currentSection?.section}
               </h1>
-            </div>
-            {!lessonPlan ? (
-              <div className="flex items-center justify-center h-32">
-                <div className="w-32 h-32">
-                  <Lottie animationData={clockLoading} loop />
+              <ChevronDownIcon className="w-5 h-5 text-gray-500 group-hover:text-orange-700 transition-colors" />
+            </button>
+            <ProgressSlider 
+              totalSteps={lessonPlan?.lessons.reduce((acc, lesson) => acc + lesson.steps.length, 0) || 0}
+              completedSteps={completedSteps.size}
+            />
+          </div>
+          
+          <div className="flex-1"></div>
+          
+          <div className="flex items-center space-x-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setIsChatOpen(true)}
+                    className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                    aria-label="Open Chat"
+                  >
+                    <MessageSquare className="w-5 h-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent><p>Open Chat</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setShowNotepad(!showNotepad)}
+                    className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                    aria-label="Open Notepad"
+                  >
+                    <BookOpen className="w-5 h-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent><p>Open Notes</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                  >
+                    <Share2 className="w-5 h-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent><p>Share Progress</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </header>
+
+        <div className="pt-14 p-6">
+          <div className="max-w-[95%] mx-auto h-full">
+            <div className="space-y-8 h-[calc(100vh-4rem)] overflow-y-auto scroll-smooth snap-y snap-mandatory">
+              {!lessonPlan ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="w-32 h-32">
+                    <Lottie animationData={clockLoading} loop />
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-8">
-                {lessonPlan.lessons.map((lesson, lessonIndex) => (
-                  <div key={lessonIndex} className="snap-start pt-4">
-                    <div className="bg-white rounded-lg shadow-md p-6">
-                      <h2 className="text-3xl font-['Gaegu'] text-orange-700">{lesson.title}</h2>
-                      <div className="space-y-4">
-                        {lesson.steps.map((step, stepIndex) => {
-                          const code = getCodeSnippet(step);
-                          const stepId = `${lessonIndex}-${stepIndex}`;
-                          const shouldShowExpand = step.explanation.length > 3;
-                          const isExpanded = expandedExplanations.has(stepId);
-                          
-                          return (
-                            <div key={stepIndex} className="snap-start pt-8">
-                              <div className="bg-gray-50 rounded-lg p-6 transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5">
-                                <div className="flex items-center justify-between mb-4">
-                                  <div className="flex items-center gap-4">
-                                    <Checkbox
-                                      checked={completedSteps.has(stepId)}
-                                      onCheckedChange={() => toggleStep(stepId)}
-                                      className="w-6 h-6 border-2 border-orange-500 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400 transition-all duration-200 hover:border-orange-600 hover:data-[state=checked]:bg-green-500 hover:data-[state=checked]:border-green-500"
-                                    />
-                                    <h3 className="text-xl font-['Gaegu'] text-orange-600">{step.title}</h3>
+              ) : (
+                <div className="space-y-8">
+                  {lessonPlan.lessons.map((lesson, lessonIndex) => (
+                    <div key={lessonIndex} className="snap-start pt-4">
+                      <div className="bg-white rounded-lg shadow-md p-6">
+                        <h2 className="text-3xl font-['Gaegu'] text-orange-700">{lesson.title}</h2>
+                        <div className="space-y-4">
+                          {lesson.steps.map((step, stepIndex) => {
+                            const code = getCodeSnippet(step);
+                            const stepId = `${lessonIndex}-${stepIndex}`;
+                            const shouldShowExpand = step.explanation.length > 3;
+                            const isExpanded = expandedExplanations.has(stepId);
+                            
+                            return (
+                              <div key={stepIndex} className="snap-start pt-8">
+                                <div className="bg-gray-50 rounded-lg p-6 transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 group">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-4">
+                                      <Checkbox
+                                        checked={completedSteps.has(stepId)}
+                                        onCheckedChange={() => toggleStep(stepId)}
+                                        className="w-6 h-6 border-2 border-orange-500 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400 transition-all duration-200 hover:border-orange-600 hover:data-[state=checked]:bg-green-500 hover:data-[state=checked]:border-green-500"
+                                      />
+                                      <h3 className="text-xl font-['Gaegu'] text-orange-600">{step.title}</h3>
+                                    </div>
+                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      {code && (
+                                        <>
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <button
+                                                  onClick={() => handleBookmarkClick(lessonIndex.toString(), stepId)}
+                                                  className="flex items-center justify-center w-7 h-7 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                                                >
+                                                  <Bookmark className="w-3.5 h-3.5" />
+                                                </button>
+                                              </TooltipTrigger>
+                                              <TooltipContent><p>Save to Notepad</p></TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <button
+                                                  onClick={() => handleCopyStep(step, stepId)}
+                                                  className="flex items-center justify-center w-7 h-7 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                                                >
+                                                  {copyingStates[stepId] ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                                </button>
+                                              </TooltipTrigger>
+                                              <TooltipContent><p>Copy Code</p></TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        </>
+                                      )}
+                                    </div>
                                   </div>
                                   {code && (
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <button
-                                            onClick={() => handleCopyStep(step, stepId)}
-                                            className="flex items-center justify-center w-8 h-8 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
-                                          >
-                                            {copyingStates[stepId] ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                                          </button>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>Copy Code</p></TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
+                                    <div className="mb-4 max-h-[calc(100vh-24rem)] overflow-y-auto border border-gray-300 rounded-lg">
+                                      <CodeBlock
+                                        code={code}
+                                        language={getLanguageFromPath(step.filePath || '')}
+                                        startLine={step.startLine || 1}
+                                        filePath={step.filePath || ''}
+                                      />
+                                    </div>
                                   )}
-                                </div>
-                                {code && (
-                                  <div className="mb-4 max-h-[calc(100vh-24rem)] overflow-y-auto">
-                                    <CodeBlock
-                                      code={code}
-                                      language={getLanguageFromPath(step.filePath || '')}
-                                      startLine={step.startLine || 1}
-                                    />
+                                  <div className="relative">
+                                    <div className="text-gray-700 leading-relaxed font-['Gaegu'] text-xl space-y-2 p-4 bg-gray-200 rounded-lg">
+                                      {step.explanation.map((exp, i) => (
+                                        <li key={i} className={!isExpanded && i >= 3 ? 'hidden' : ''}>
+                                          {exp}
+                                        </li>
+                                      ))}
+                                    </div>
+                                    {shouldShowExpand && (
+                                      <button
+                                        onClick={() => toggleExplanation(stepId)}
+                                        className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-300 transition-colors"
+                                      >
+                                        {isExpanded ? (
+                                          <ChevronUp className="w-5 h-5 text-gray-600" />
+                                        ) : (
+                                          <ChevronDown className="w-5 h-5 text-gray-600" />
+                                        )}
+                                      </button>
+                                    )}
                                   </div>
-                                )}
-                                <div className="relative">
-                                  <div className="text-gray-700 leading-relaxed font-['Gaegu'] text-xl space-y-2 p-4 bg-gray-200 rounded-lg">
-                                    {step.explanation.map((exp, i) => (
-                                      <li key={i} className={!isExpanded && i >= 3 ? 'hidden' : ''}>
-                                        {exp}
-                                      </li>
-                                    ))}
-                                  </div>
-                                  {shouldShowExpand && (
-                                    <button
-                                      onClick={() => toggleExplanation(stepId)}
-                                      className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-300 transition-colors"
-                                    >
-                                      {isExpanded ? (
-                                        <ChevronUp className="w-5 h-5 text-gray-600" />
-                                      ) : (
-                                        <ChevronDown className="w-5 h-5 text-gray-600" />
-                                      )}
-                                    </button>
-                                  )}
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      <CourseNotepad
+        notes={courseNotes}
+        lessons={lessonPlan?.lessons.map((lesson, index) => ({
+          id: index.toString(),
+          title: lesson.title,
+          steps: lesson.steps.map((step, stepIndex) => ({
+            id: `${index}-${stepIndex}`,
+            title: step.title,
+            explanation: step.explanation
+          }))
+        })) || []}
+        onEditNote={handleEditNote}
+        onDeleteNote={handleDeleteNote}
+        isOpen={showNotepad}
+        onOpenChange={setShowNotepad}
+        initialView={initialView}
+        initialLessonId={selectedLessonId}
+        initialStepId={selectedStepId}
+      />
+      <ChatModal isOpen={isChatOpen} onOpenChange={setIsChatOpen} />
+      <SectionModal 
+        isOpen={isSectionModalOpen} 
+        onOpenChange={setIsSectionModalOpen}
+        currentSection={section || ''}
+      />
     </div>
   );
 };
