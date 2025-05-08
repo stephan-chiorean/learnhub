@@ -1,13 +1,16 @@
 # LearnHub
 
-A modern web application for learning and exploring GitHub repositories. Built with React and Tailwind CSS.
+A modern web application for learning and exploring GitHub repositories. Built with React, Node.js, and Tailwind CSS.
 
 ## Features
 
 - Clean and intuitive user interface
-- GitHub repository URL input
-- Responsive design
-- Modern styling with Tailwind CSS
+- GitHub repository exploration
+- AI-powered explanations and summarization
+- Notebook functionality with notes per section
+- Section navigator for seamless repo exploration
+- Theme toggle (light / dark)
+- Responsive design with modern styling using Tailwind CSS
 
 ## Getting Started
 
@@ -15,35 +18,45 @@ A modern web application for learning and exploring GitHub repositories. Built w
 
 - Node.js (v14 or higher)
 - npm or yarn
+- GitHub account
+- OpenAI API key
+- Pinecone account
 
 ### Installation
 
-1. Clone the repository
+1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/learnhub.git
+git clone https://github.com/stephan-chiorean/learnhub.git
 cd learnhub
 ```
 
-2. Install dependencies
+2. Create a `.env` file at the root of the project with the following variables:
+```env
+GITHUB_TOKEN=your_github_token
+OPENAI_API_KEY=your_openai_key
+PINECONE_API_KEY=your_pinecone_key
+PINECONE_HOST=your_pinecone_host
+PINECONE_INDEX=your_pinecone_index
+```
+
+### Running the Application
+
+1. Start the frontend:
 ```bash
+# From the root directory
 npm install
-# or
-yarn install
+npm run dev
 ```
 
-3. Start the development server
+2. Start the backend:
 ```bash
-npm start
-# or
-yarn start
+# In a new terminal
+cd server
+npm install
+npm run dev
 ```
 
-## Technologies Used
+The backend of the application should now be running at `http://localhost:3000`
+Frontend will be accesible at `http://localhost:5173`
 
-- React
-- Tailwind CSS
-- JavaScript/JSX
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details. 
