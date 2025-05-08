@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import axios from 'axios';
 
 export interface Annotation {
@@ -10,7 +10,7 @@ export interface Annotation {
   filePath: string;
 }
 
-interface FileContent {
+export interface FileContent {
   content: string;
   path: string;
 }
@@ -23,7 +23,7 @@ interface WorkspaceContextType {
   error: string | null;
   namespace: string | null;
   fetchDirectoryTree: (owner: string, repo: string) => Promise<void>;
-  fetchFileContent: (owner: string, repo: string, path: string) => Promise<void>;
+  fetchFileContent: (owner: string, repo: string, path: string) => Promise<FileContent>;
   addAnnotation: (annotation: Omit<Annotation, 'id'>) => void;
   removeAnnotation: (id: string) => void;
   setNamespace: (namespace: string) => void;
@@ -37,7 +37,18 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [namespace, setNamespaceState] = useState<string | null>(null);
+  const [namespace, setNamespaceState] = useState<string | null>(() => {
+    // Initialize from localStorage if available
+    const savedNamespace = localStorage.getItem('workspaceNamespace');
+    return savedNamespace || null;
+  });
+
+  // Effect to update localStorage when namespace changes
+  useEffect(() => {
+    if (namespace) {
+      localStorage.setItem('workspaceNamespace', namespace);
+    }
+  }, [namespace]);
 
   const fetchDirectoryTree = async (owner: string, repo: string) => {
     setIsLoading(true);
@@ -49,7 +60,8 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
         repo
       });
       setDirectoryTree(response.data.directoryTree);
-      setNamespaceState(`${owner}_${repo}`);
+      const newNamespace = `${owner}_${repo}`;
+      setNamespaceState(newNamespace);
     } catch (err) {
       setError('Failed to fetch directory tree');
       console.error(err);
@@ -65,13 +77,16 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
       const response = await axios.get('http://localhost:3001/api/fileContent', {
         params: { owner, repo, path }
       });
-      setCurrentFile({
+      const fileContent = {
         content: response.data.content,
         path
-      });
+      };
+      setCurrentFile(fileContent);
+      return fileContent;
     } catch (err) {
       setError('Failed to fetch file content');
       console.error(err);
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -91,6 +106,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const setNamespace = (namespace: string) => {
     setNamespaceState(namespace);
+    localStorage.setItem('workspaceNamespace', namespace);
   };
 
   return (

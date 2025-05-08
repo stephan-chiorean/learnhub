@@ -409,173 +409,139 @@ app.post('/api/generateLessonPlan', async (req: Request, res: Response) => {
   try {
     const { section, sectionId, description, files } = req.body;
 
-    // Validate required fields
     if (!section || !sectionId || !description || !files) {
-      return res.status(400).json({ 
-        error: 'Missing required fields. Please provide section, sectionId, description, and files' 
-      });
-    }
-
-    // Validate array types
-    if (!Array.isArray(description) || !Array.isArray(files)) {
-      return res.status(400).json({ 
-        error: 'description and files must be arrays' 
-      });
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
     // Extract namespace from sectionId (assuming format: owner_repo)
     const namespace = sectionId.split('_').slice(0, 2).join('_');
-    
-    // Fetch file contents from Pinecone
     const [owner, repo] = namespace.split('_');
 
+    // Fetch all file contents
     const fileContents = await Promise.all(
-      files.map(async (filePath) => {
-        const content = await fetchFileContent(owner, repo, filePath);
-        return {
-          path: filePath,
-          content
-        };
+      files.map(async (filePath: string) => {
+        try {
+          const content = await fetchFileContent(owner, repo, filePath);
+          return {
+            path: filePath,
+            content
+          };
+        } catch (error) {
+          console.error(`Failed to fetch content for ${filePath}:`, error);
+          return {
+            path: filePath,
+            content: null
+          };
+        }
       })
     );
 
     // Format file contents for the prompt
     const formattedFileContents = fileContents
-      .map(file => `File: ${file.path}\nContent:\n${file.content}\n`)
-      .join('\n---\n');
+      .filter(file => file.content !== null)
+      .map(file => {
+    const lines = file.content!.split('\n').map((line: string, index: number) => `Line ${index + 1}: ${line}`).join('\n');
+    return `File: ${file.path}\n${lines}`;
+    }).join('\n---\n');
 
-    const prompt = `You are an expert code educator. Given this codebase section and its description and files, create a detailed lesson plan to teach a developer.
+    const prompt = `
+Create a detailed lesson plan for the following section of code.
 
 Section: ${section}
-Description: ${description.join('\n')}
-Files: ${files.join('\n')}
+Section ID: ${sectionId}
+Description:
+${description.join('\n')}
+
+Files:
+${files.join(', ')}
 
 File Contents:
 ${formattedFileContents}
 
-Break this into major lessons. Each lesson should contain multiple step-throughs.
+Follow all global rules carefully when generating the lesson plan.
 
-For each step-through, you must include:
-- title: short descriptive title
-- filePath: (string) which file this code snippet is from, or null if no code
-- startLine: (number) the starting line number of the snippet, or null if no code
-- endLine: (number) the ending line number of the snippet, or null if no code
-- code: (optional string) code snippet itself, or null if not applicable
-- explanation: description and explanation of the code or concept
-
-IMPORTANT RULES:
-1. When there is no code snippet for a step, set filePath, startLine, endLine, and code to null
-2. Always include line numbers (startLine and endLine) when referencing code
-3. Make sure line numbers are accurate and match the provided file contents
-4. Keep code snippets focused and relevant to the explanation
-5. Include both conceptual steps (no code) and code-specific steps
-6. Order steps logically to build understanding
-
-Respond with a JSON object in this exact structure:
+The lesson plan should be a JSON object using this structure:
 {
-  "sectionId": "${sectionId}",
+  "sectionId": string,
   "lessons": [
     {
-      "title": "Lesson title",
+      "title": string,
       "steps": [
         {
-          "title": "Step title",
-          "filePath": "path/to/file.ts",
-          "startLine": 123,
-          "endLine": 130,
-          "code": "The code snippet here",
-          "explanation": "Explanation text"
+          "title": string,
+          "filePath": string | null,
+          "startLine": number | null,
+          "endLine": number | null,
+          "explanation": string[]
         }
       ]
     }
   ]
-}`;
+}
+
+Additional task-specific instructions:
+- Break complex code into logical steps for better understanding.
+- Include all relevant code sections and endpoints in the steps.
+- Explanations must be arrays of clear, complete thoughts as strings.
+- Each explanation point should be a full sentence and self-contained.
+- Only include error handling or edge cases if crucial to understanding.
+- Do NOT include markdown, backticks, or formatting in your output.
+- Never wrap the response in a code block. Output ONLY the raw JSON.
+- Ensure line numbers are 100% accurate — double-check each carefully.
+- For each step, ensure the line numbers precisely match the code being explained.
+- Use the provided file contents to verify line numbers and code sections.
+- All file contents are provided with explicit line numbers. You MUST reference the exact line numbers shown when generating startLine and endLine.
+`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4o-2024-05-13", // Use the 128k context version
       messages: [
         {
           role: "system",
-          content: `You are an expert code educator. Your task is to create detailed, accurate lesson plans with precise code references.
-          
-Important guidelines:
-1. Always verify line numbers match the provided file contents
-2. Include both conceptual and code-specific steps
-3. When no code is referenced, set filePath, startLine, endLine, and code to null
-4. Keep code snippets focused and relevant
-5. Order steps logically to build understanding
-6. Only output valid JSON matching the exact structure provided`
+          content: `
+            You are a technical documentation expert. Your task is to create detailed lesson plans for code sections.
+            - NEVER wrap your response in markdown or code blocks.
+            - Output ONLY the raw JSON object.
+            - Line numbers MUST be 100% accurate - double-check each one.
+            - Format explanations as arrays of complete descriptions.
+            - Ensure all explanations are clear and detailed.
+            - Include all relevant code sections.
+            - Break down complex code into logical steps.
+            - Each step should have precise line numbers.
+            - Verify line numbers against the provided file contents.
+          `.trim()
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      temperature: 0.7,
-      max_tokens: 2000
+      temperature: 0.2,
+      max_tokens: 4096, // Adjusted to allow larger responses
     });
 
-    let lessonPlan: LessonPlan | undefined;
-    try {
-      const parsedPlan = JSON.parse(completion.choices[0]?.message?.content?.trim() || '');
-      if (isLessonPlan(parsedPlan)) {
-        lessonPlan = parsedPlan;
-      } else {
-        throw new Error('Invalid lesson plan structure');
-      }
-    } catch (e) {
-      // Try to fix common issues (e.g., code block wrappers)
-      const fixedPlan = (completion.choices[0]?.message?.content?.trim() || '').replace(/^[^\{]*({[\s\S]*})[^\}]*$/m, '$1');
-      try {
-        const parsedPlan = JSON.parse(fixedPlan);
-        if (isLessonPlan(parsedPlan)) {
-          lessonPlan = parsedPlan;
-        } else {
-          throw new Error('Invalid lesson plan structure');
-        }
-      } catch (e2) {
-        console.error('Failed to parse lesson plan JSON:', completion.choices[0]?.message?.content);
-        return res.status(500).json({ error: 'Failed to parse lesson plan JSON', raw: completion.choices[0]?.message?.content });
-      }
-    }
-
-    if (!lessonPlan) {
+    const lessonPlanJson = completion.choices[0]?.message?.content?.trim();
+    if (!lessonPlanJson) {
       return res.status(500).json({ error: 'Failed to generate lesson plan' });
     }
 
-    // Validate the structure of the parsed lesson plan
-    if (!lessonPlan.sectionId || !Array.isArray(lessonPlan.lessons)) {
-      return res.status(500).json({ error: 'Invalid lesson plan structure' });
-    }
-
-    // Validate each lesson and step
-    for (const lesson of lessonPlan.lessons) {
-      if (!lesson.title || !Array.isArray(lesson.steps)) {
-        return res.status(500).json({ error: 'Invalid lesson structure' });
-      }
-
-      for (const step of lesson.steps) {
-        if (!step.title || !step.explanation) {
-          return res.status(500).json({ error: 'Invalid step structure' });
-        }
-
-        // Validate code-related fields
-        if (step.filePath !== null) {
-          if (typeof step.startLine !== 'number' || typeof step.endLine !== 'number') {
-            return res.status(500).json({ error: 'Invalid line numbers in step' });
-          }
-        } else {
-          // If no filePath, ensure all code-related fields are null
-          if (step.startLine !== null || step.endLine !== null || step.code !== null) {
-            return res.status(500).json({ error: 'Invalid null code fields in step' });
-          }
-        }
+    try {
+      const lessonPlan = JSON.parse(lessonPlanJson);
+      res.json(lessonPlan);
+    } catch (e) {
+      const cleanedJson = lessonPlanJson.replace(/^[^\{]*(\{[\s\S]*\})[^\}]*$/m, '$1');
+      try {
+        const lessonPlan = JSON.parse(cleanedJson);
+        res.json(lessonPlan);
+      } catch (e2) {
+        return res.status(500).json({ 
+          error: 'Failed to parse lesson plan JSON', 
+          raw: completion.choices[0]?.message?.content 
+        });
       }
     }
-
-    res.json(lessonPlan);
   } catch (error) {
-    console.error('Error in generateLessonPlan endpoint:', error);
+    console.error('Error generating lesson plan:', error);
     res.status(500).json({ error: 'Failed to generate lesson plan' });
   }
 });
@@ -593,7 +559,8 @@ function isLessonPlan(obj: any): obj is LessonPlan {
       lesson.steps.every((step: any) =>
         step &&
         typeof step.title === 'string' &&
-        typeof step.explanation === 'string' &&
+        Array.isArray(step.explanation) &&
+        step.explanation.every((exp: any) => typeof exp === 'string') &&
         (step.filePath === null || typeof step.filePath === 'string') &&
         (step.startLine === null || typeof step.startLine === 'number') &&
         (step.endLine === null || typeof step.endLine === 'number') &&
