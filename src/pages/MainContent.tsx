@@ -1,5 +1,11 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useWorkspace } from '../context/WorkspaceContext'
+import Workspace from '../components/Workspace'
+import CodeViewer from './CodeViewer'
+import CourseConsole from './CourseConsole'
+import Walkthrough from './Walkthrough'
 
 interface MainContentProps {
   isSidebarOpen: boolean

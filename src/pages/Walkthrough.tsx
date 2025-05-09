@@ -3,10 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useWalkthrough } from '../context/WalkthroughContext';
 import Lottie from 'lottie-react';
 import AtomLoader from '../../assets/AtomLoader.json';
-import { Checkbox } from './ui/checkbox';
-import { Button } from './ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Checkbox } from '../components/ui/checkbox';
+import { Button } from '../components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { HelpCircle } from 'lucide-react';
+import WalkthroughModal from '../components/ui/walkthrough/walkthrough-modal';
+import { MultiStepModal } from '../components/ui/walkthrough/multi-step-modal';
 
 const Walkthrough: React.FC = () => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();

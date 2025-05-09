@@ -4,16 +4,16 @@ import { Copy, Check, ChevronDown, ChevronUp, BookOpen, Share2, BarChart2, Bookm
 import { useWalkthrough } from '../context/WalkthroughContext';
 import { getLanguageFromPath } from '../utils/languageDetector';
 import { newcourse } from '../lib/mock/newcourse';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { FileContent, useWorkspace } from '../context/WorkspaceContext';
 import Lottie from 'lottie-react';
 import clockLoading from '../../assets/ClockLoading.json';
-import { Checkbox } from './ui/checkbox';
-import { CodeBlock } from './ui/walkthrough/code-block';
-import CourseNotepad from './ui/walkthrough/courseNotebook';
-import { ProgressSlider } from './ui/walkthrough/courseNotebook';
-import ChatModal from './ChatModal';
-import SectionModal from './ui/walkthrough/section-modal';
+import { Checkbox } from '../components/ui/checkbox';
+import { CodeBlock } from '../components/ui/walkthrough/code-block';
+import CourseNotepad from '../components/ui/walkthrough/courseNotebook';
+import { ProgressSlider } from '../components/ui/walkthrough/courseNotebook';
+import ChatModal from '../components/ChatModal';
+import SectionModal from '../components/ui/walkthrough/section-modal';
 
 export interface LessonStep {
   title: string;

@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
+import MainContent from './pages/MainContent'
+import CodeViewer from './pages/CodeViewer'
+import Walkthrough from './pages/Walkthrough'
+import CourseConsole from './pages/CourseConsole'
+import Workspace from './components/Workspace'
 import Header from './components/Header'
 import Sidebar from './components/Sidebar'
-import MainContent from './components/MainContent'
-import Workspace from './components/Workspace'
-import CodeViewer from './components/CodeViewer'
-import Walkthrough from './components/Walkthrough'
 import useSidebar from './hooks/useSidebar'
 import { WorkspaceProvider } from './context/WorkspaceContext'
 import { WalkthroughProvider } from './context/WalkthroughContext'
-import CourseConsole from './components/CourseConsole'
 
 const AppContent: React.FC<{ isSidebarOpen: boolean; toggleSidebar: () => void }> = ({ isSidebarOpen, toggleSidebar }) => {
   const [showHeader, setShowHeader] = useState(true);
