@@ -14,6 +14,8 @@ import {
   initializeEnvironment 
 } from './workspaces/workspaceHelpers.ts';
 import { Pinecone } from '@pinecone-database/pinecone';
+import { b } from '../baml_client/index.js'
+import { FileMetadata, PlanSection } from '../baml_client/types.js'
 
 dotenv.config({ path: '../.env' });
 initializeEnvironment();
@@ -312,92 +314,16 @@ app.post('/api/plan', async (req: Request, res: Response) => {
       includeValues: false
     });
 
-    // Format file paths for the prompt
-    const files = queryResponse.matches
+    // Convert the files to FileMetadata format
+    const files: FileMetadata[] = queryResponse.matches
       .filter(match => match.metadata && typeof match.metadata.filePath === 'string')
-      .map(match => `File: ${match.metadata!.filePath}`);
-    const fileList = files.join('\n');
+      .map(match => ({
+        filePath: match.metadata!.filePath
+      })) as FileMetadata[];
 
-    const prompt = `Given the following list of files in a codebase, create a structured walkthrough plan grouped into logical implementation domains based on how the project works.
-
-    The groupings should reflect responsibilities and functionality, NOT folders or filenames. Domains may include things like Authentication, Repository Indexing, Context Injection, AI Interfaces, Integrations, UI Views, Utility Functions, Infrastructure, and Tests, but the exact domains should be determined based on the shape of the project.
-    
-    The walkthrough plan should be dynamic and adapt based on the project. If certain domains are not present (such as Authentication or Database layers), omit them. Only include domains that are actually represented in the provided file list. If no releveant files exist for a domain, do not create a section for it at all.
-    
-    Order the sections to reflect the natural flow for someone learning and exploring the codebase. In general, the flow should be:
-    - Start with server entrypoints and initialization logic (if present)
-    - Move to API and integration layers
-    - Proceed to internal and shared logic
-    - Cover data access and domain logic (if applicable)
-    - Move into frontend entrypoints and major views/screens
-    - UI components should be limited to only major components or views that represent key parts of the user interface. Do NOT include small, reusable UI components (such as generic buttons, inputs, or utility elements) at this stage. These will be covered later during section deep dives.
-    - Finish with infrastructure, tooling, and tests (if present)
-    
-    Think of this plan as setting up "Checkpoints" — a high-level overview of the major domains and logical flow of the project, without going into deep detail yet. Detailed steps and breakdowns will happen later within each section.
-    
-    For each domain, provide:
-    - "section": The name of the domain
-    - "description": An array of 3-5 well-written and natural sounding bullet points, written as if an experienced engineer is explaining the system to a peer. Avoid repetitive or generic phrasing like "This part of the codebase" or "It is responsible for." Instead, be specific about the kind of logic, operations, and decision-making that happen in this domain. Focus on helping the reader understand what kinds of tasks are performed, what is important or nuanced about this domain, and how it interacts with other parts of the system. Assume the reader is a new engineer joining the project and needs to understand how to work with this part of the codebase effectively.
-      - What this part of the codebase does
-      - How it fits into the overall system
-      - What responsibilities or roles it plays in the application architecture
-      - Any key interactions with other parts of the system
-    - "files": The relevant file paths
-    
-    When creating the plan, think carefully about how each section flows into the next. Consider how a reader would naturally progress from one domain to another to understand the codebase. However, do NOT include linkPrevious or linkNext in the output. These should only inform your internal reasoning to order and connect the sections in a meaningful and natural way.
-    
-    Respond ONLY with a JSON array in this format:
-    
-    [
-      {
-        "section": "Section Title",
-        "description": ["Detailed bullet point 1", "Detailed bullet point 2", "Detailed bullet point 3"],
-        "files": ["file1.ts", "file2.ts"]
-      },
-      ...
-    ]
-    
-    Here are the files:
-    
-    ${fileList}`
-
-    // Send to OpenAI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert course planner. Only output valid JSON as described. Make sure the JSON is complete and properly formatted.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.2,
-      max_tokens: 2000
-    });
-
-    let plan = completion.choices[0]?.message?.content?.trim();
-    if (!plan) {
-      return res.status(500).json({ error: 'Failed to generate plan' });
-    }
-
-    // Try to parse the JSON
-    try {
-      plan = JSON.parse(plan);
-    } catch (e) {
-      // Try to fix common issues (e.g., code block wrappers)
-      plan = (plan || '').replace(/^[^\[]*(\[[\s\S]*\])[^[\]]*$/m, '$1');
-      try {
-        plan = JSON.parse(plan);
-      } catch (e2) {
-        console.error('Failed to parse plan JSON:', plan);
-        return res.status(500).json({ error: 'Failed to parse plan JSON', raw: plan });
-      }
-    }
-
-    res.json({ plan });
+    // Use the BAML function instead of direct OpenAI call
+    const plan = await b.GenerateCodeWalkthrough(files);
+    res.json({plan});
   } catch (error) {
     console.error('Error in plan endpoint:', error);
     res.status(500).json({ error: 'Failed to generate plan' });
