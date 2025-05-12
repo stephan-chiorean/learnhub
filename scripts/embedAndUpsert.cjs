@@ -20,6 +20,30 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
+async function generateNaturalLanguageSummary(chunk) {
+    try {
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are a senior software engineer who explains code clearly and concisely."
+                },
+                {
+                    role: "user",
+                    content: `Explain the following ${chunk.type} found in ${chunk.filePath} in plain English:\n\n${chunk.content}`
+                }
+            ],
+            temperature: 0.3,
+            max_tokens: 150
+        });
+        return completion.choices[0].message.content.trim();
+    } catch (error) {
+        console.error('Error generating natural language summary:', error.message);
+        throw error;
+    }
+}
+
 // Log environment variables (without sensitive data)
 console.log('Environment Configuration:');
 console.log('PINECONE_HOST:', process.env.PINECONE_HOST);
@@ -57,16 +81,30 @@ async function processChunks() {
             try {
                 // Get embeddings for the batch
                 const vectors = await Promise.all(batch.map(async (chunk) => {
-                    const embedding = await getEmbedding(chunk.content);
+                    // Generate natural language summary
+                    const nlSummary = await generateNaturalLanguageSummary(chunk);
+                    
+                    // Get embedding for the summary
+                    const embedding = await getEmbedding(nlSummary);
+                    
                     return {
                         id: chunk.id,
                         values: embedding,
                         metadata: {
                             filePath: chunk.filePath,
                             type: chunk.type,
-                            content: chunk.content,
-                            ...(chunk.functionName && { functionName: chunk.functionName })
-                        }
+                            summary: nlSummary,
+                            content: chunk.content, // optional – for traceability
+                            ...(chunk.functionName && { functionName: chunk.functionName }),
+                            ...(chunk.startLine !== undefined && { startLine: chunk.startLine }),
+                            ...(chunk.endLine !== undefined && { endLine: chunk.endLine }),
+                            ...(chunk.zoneGuess && { zoneGuess: chunk.zoneGuess }),
+                            ...(chunk.relativeDir && { relativeDir: chunk.relativeDir }),
+                            ...(chunk.fileName && { fileName: chunk.fileName }),
+                            ...(chunk.extension && { extension: chunk.extension }),
+                            ...(chunk.isTestFile !== undefined && { isTestFile: chunk.isTestFile }),
+                          }
+                          
                     };
                 }));
 

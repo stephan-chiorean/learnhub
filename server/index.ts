@@ -72,6 +72,7 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
     // Fetch repository metadata
     const repoData = await fetchRepoMetadata(owner, repo);
     const defaultBranch = repoData.default_branch;
+    const codeChunks: string[] = []
 
     // Only embed codebase if namespace doesn't already exist
     if (!namespaceExists) {
@@ -94,6 +95,7 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
         forks: repoData.forks_count,
       },
       directoryTree: nestedTree,
+      codeChunks: codeChunks,
       clonedPath: tempDir,
       needsProcessing: !namespaceExists
     });
