@@ -15,6 +15,22 @@ export interface FileContent {
   path: string;
 }
 
+export interface CodeChunk {
+  id: string;
+  file_path: string;
+  file_name: string;
+  relative_dir: string;
+  extension: string;
+  type: string;
+  text: string;
+  start_line: number;
+  end_line: number;
+  size: number;
+  is_test_file: boolean;
+  zone_guess: string;
+  function_name: string;
+}
+
 export interface ProgressUpdate {
   type: 'init' | 'progress' | 'complete' | 'error';
   stage?: string;
@@ -32,8 +48,10 @@ interface WorkspaceContextType {
   error: string | null;
   namespace: string | null;
   progress: ProgressUpdate | null;
+  chunks: CodeChunk[];
   fetchDirectoryTree: (owner: string, repo: string) => Promise<void>;
   fetchFileContent: (owner: string, repo: string, path: string) => Promise<FileContent>;
+  fetchChunks: () => Promise<void>;
   addAnnotation: (annotation: Omit<Annotation, 'id'>) => void;
   removeAnnotation: (id: string) => void;
   setNamespace: (namespace: string) => void;
@@ -53,6 +71,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     return savedNamespace || null;
   });
   const [progress, setProgress] = useState<ProgressUpdate | null>(null);
+  const [chunks, setChunks] = useState<CodeChunk[]>([]);
 
   // Effect to update localStorage when namespace changes
   useEffect(() => {
@@ -82,6 +101,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
 
       const decoder = new TextDecoder();
       let buffer = '';
+      let workspaceCreated = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -101,6 +121,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
                 setDirectoryTree(data.data.directoryTree);
                 const newNamespace = `${owner}_${repo}`;
                 setNamespaceState(newNamespace);
+                workspaceCreated = true;
               } else if (data.type === 'error') {
                 setError(data.error);
               }
@@ -109,6 +130,14 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
             }
           }
         }
+      }
+
+      // Fetch chunks after workspace creation is complete
+      if (workspaceCreated) {
+        const chunksResponse = await axios.get('http://localhost:3001/api/chunks', {
+          params: { namespace: `${owner}_${repo}` }
+        });
+        setChunks(chunksResponse.data);
       }
     } catch (err) {
       setError('Failed to fetch directory tree');
@@ -140,6 +169,20 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   };
 
+  const fetchChunks = async () => {
+    if (!namespace) return;
+    
+    try {
+      const response = await axios.get(`http://localhost:3001/api/chunks`, {
+        params: { namespace }
+      });
+      setChunks(response.data);
+    } catch (err) {
+      console.error('Failed to fetch chunks:', err);
+      setError('Failed to fetch code chunks');
+    }
+  };
+
   const addAnnotation = (annotation: Omit<Annotation, 'id'>) => {
     const newAnnotation = {
       ...annotation,
@@ -166,8 +209,10 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
       error,
       namespace,
       progress,
+      chunks,
       fetchDirectoryTree,
       fetchFileContent,
+      fetchChunks,
       addAnnotation,
       removeAnnotation,
       setNamespace

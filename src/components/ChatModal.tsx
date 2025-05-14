@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SiOpenai } from 'react-icons/si';
 import { useParams, useNavigate } from 'react-router-dom';
-import ContextPopover from './ContextPopover';
+import ContextPopover, { getContextIcon } from './ContextPopover';
 import { Lightbulb, BookOpen, Brain, StickyNote, GitBranch } from 'lucide-react';
 import Tips from './ui/tips';
 import { getFileIcon } from '../utils/fileIcons';
@@ -34,7 +34,8 @@ interface ChatModalProps {
 
 interface Context {
   path: string;
-  type: 'file' | 'directory';
+  type: 'blob' | 'tree' | 'function';
+  metadata?: any;
 }
 
 const fontClass = "font-['Gaegu'] text-lg text-gray-700";
@@ -80,8 +81,8 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
     return () => textarea.removeEventListener('input', adjustHeight);
   }, []);
 
-  const handleContextSelect = (path: string, type: 'file' | 'directory') => {
-    setContexts(prev => [...prev, { path, type }]);
+  const handleContextSelect = (path: string, type: 'blob' | 'tree' | 'function', metadata?: any) => {
+    setContexts(prev => [...prev, { path, type, metadata }]);
   };
 
   const handleRemoveContext = (index: number) => {
@@ -253,23 +254,10 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
                   key={index}
                   className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1"
                 >
-                  {context.type === 'file' ? (
-                    getFileIcon(context.path)
-                  ) : (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4 text-orange-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                      />
-                    </svg>
+                  {getContextIcon(
+                    context.path,
+                    context.type,
+                    context.metadata?.function_name
                   )}
                   <span className="text-sm text-gray-700">{context.path}</span>
                   <button
