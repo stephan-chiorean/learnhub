@@ -389,7 +389,12 @@ export const chunkRepository = async (owner: string, repo: string, sessionId: st
 };
 
 // Helper function to embed and upsert chunks to Pinecone
-export const embedAndUpsertChunks = async (owner: string, repo: string, sessionId: string): Promise<void> => {
+export const embedAndUpsertChunks = async (
+  owner: string, 
+  repo: string, 
+  sessionId: string,
+  onProgress?: (progress: { stage: string; message: string; progress?: number }) => void
+): Promise<void> => {
   const walkthroughDir = path.join('/tmp', 'walkthrough');
   const chunksFile = path.join(walkthroughDir, `${repo}_chunks_${sessionId}.code.json`);
   const summariesFile = path.join(walkthroughDir, `${repo}_summaries_${sessionId}.json`);
@@ -426,16 +431,39 @@ export const embedAndUpsertChunks = async (owner: string, repo: string, sessionI
           const progressEvent = JSON.parse(output);
           if (progressEvent.stage === 'processing') {
             processingBar.update(Math.round(progressEvent.progress || 0));
+            onProgress?.({
+              stage: 'processing',
+              message: progressEvent.message,
+              progress: progressEvent.progress
+            });
           } else if (progressEvent.stage === 'embedding') {
             embeddingBar.update(Math.round(progressEvent.progress || 0));
+            onProgress?.({
+              stage: 'embedding',
+              message: progressEvent.message,
+              progress: progressEvent.progress
+            });
           } else if (progressEvent.stage === 'upserting') {
             upsertingBar.update(Math.round(progressEvent.progress || 0));
+            onProgress?.({
+              stage: 'upserting',
+              message: progressEvent.message,
+              progress: progressEvent.progress
+            });
           } else if (progressEvent.stage === 'complete') {
             multibar.stop();
             console.log(`\n✅ ${progressEvent.message}`);
+            onProgress?.({
+              stage: 'complete',
+              message: progressEvent.message
+            });
           } else if (progressEvent.stage === 'error') {
             multibar.stop();
             console.error(`\n❌ ${progressEvent.message}`);
+            onProgress?.({
+              stage: 'error',
+              message: progressEvent.message
+            });
           } else {
             // For other events, just log the message
             console.log(output);

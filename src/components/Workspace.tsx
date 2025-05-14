@@ -74,7 +74,7 @@ const nodeTypes: NodeTypes = {
 const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
   const navigate = useNavigate()
-  const { directoryTree, isLoading, error, fetchDirectoryTree } = useWorkspace()
+  const { directoryTree, isLoading, error, fetchDirectoryTree, progress } = useWorkspace()
   const [workspaceAlias, setWorkspaceAlias] = useState(`${owner}/${repo}`)
   const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -250,9 +250,35 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
       <div className={`flex-1 overflow-auto pt-14 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
         <div className="flex flex-col items-center justify-center h-full">
           <div className="w-64 h-64">
-            <Lottie animationData={ClockLoading} loop={true} />
+            {progress?.stage === 'embedding' ? (
+              <Lottie animationData={EqualizerLoader} loop={true} />
+            ) : progress?.stage === 'chunking' ? (
+              <Lottie animationData={LoadingRings} loop={true} />
+            ) : (
+              <Lottie animationData={ClockLoading} loop={true} />
+            )}
           </div>
-          <h2 className="text-3xl font-['Gaegu'] text-orange-700 mt-4">Setting up your Workspace</h2>
+          <h2 className="text-3xl font-['Gaegu'] text-orange-700 mt-4">
+            {progress?.message || 'Setting up your Workspace'}
+          </h2>
+          {typeof progress?.progress === 'number' && (
+            <div className="w-64 mt-4">
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-orange-600 h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${progress.progress}%` }}
+                />
+              </div>
+              <p className="text-sm text-gray-600 mt-2 text-center">
+                {Math.round(progress.progress)}%
+              </p>
+            </div>
+          )}
+          {progress?.stage && (
+            <p className="text-sm text-gray-500 mt-2">
+              {progress.stage.charAt(0).toUpperCase() + progress.stage.slice(1)}
+            </p>
+          )}
         </div>
       </div>
     );

@@ -15,6 +15,15 @@ export interface FileContent {
   path: string;
 }
 
+export interface ProgressUpdate {
+  type: 'init' | 'progress' | 'complete' | 'error';
+  stage?: string;
+  message?: string;
+  progress?: number;
+  error?: string;
+  data?: any;
+}
+
 interface WorkspaceContextType {
   directoryTree: any[];
   currentFile: FileContent | null;
@@ -22,6 +31,7 @@ interface WorkspaceContextType {
   isLoading: boolean;
   error: string | null;
   namespace: string | null;
+  progress: ProgressUpdate | null;
   fetchDirectoryTree: (owner: string, repo: string) => Promise<void>;
   fetchFileContent: (owner: string, repo: string, path: string) => Promise<FileContent>;
   addAnnotation: (annotation: Omit<Annotation, 'id'>) => void;
@@ -42,6 +52,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     const savedNamespace = localStorage.getItem('workspaceNamespace');
     return savedNamespace || null;
   });
+  const [progress, setProgress] = useState<ProgressUpdate | null>(null);
 
   // Effect to update localStorage when namespace changes
   useEffect(() => {
@@ -53,15 +64,52 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   const fetchDirectoryTree = async (owner: string, repo: string) => {
     setIsLoading(true);
     setError(null);
+    setProgress(null);
+
     try {
-      console.log('Making API call to createWorkspace for:', owner, repo);
-      const response = await axios.post('http://localhost:3001/api/createWorkspace', {
-        owner,
-        repo
+      const response = await fetch('http://localhost:3001/api/createWorkspace', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ owner, repo }),
       });
-      setDirectoryTree(response.data.directoryTree);
-      const newNamespace = `${owner}_${repo}`;
-      setNamespaceState(newNamespace);
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Failed to get response reader');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              setProgress(data);
+
+              if (data.type === 'complete') {
+                setDirectoryTree(data.data.directoryTree);
+                const newNamespace = `${owner}_${repo}`;
+                setNamespaceState(newNamespace);
+              } else if (data.type === 'error') {
+                setError(data.error);
+              }
+            } catch (e) {
+              console.error('Failed to parse progress update:', e);
+            }
+          }
+        }
+      }
     } catch (err) {
       setError('Failed to fetch directory tree');
       console.error(err);
@@ -117,6 +165,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
       isLoading,
       error,
       namespace,
+      progress,
       fetchDirectoryTree,
       fetchFileContent,
       addAnnotation,

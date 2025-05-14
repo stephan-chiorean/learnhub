@@ -72,9 +72,17 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Owner and repo are required' });
     }
 
+    // Set headers for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
     // Generate unique session ID
     const sessionId = randomUUID();
     const namespace = `${owner}_${repo}`;
+
+    // Send initial progress
+    res.write(`data: ${JSON.stringify({ type: 'init', message: 'Starting workspace creation...' })}\n\n`);
 
     // Check if namespace exists in Pinecone
     const namespaceExists = await checkNamespaceExists(namespace);
@@ -90,32 +98,48 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
 
     if (!namespaceExists || codeChunks.length === 0) {
       // If namespace doesn't exist, process everything
+      res.write(`data: ${JSON.stringify({ type: 'progress', stage: 'cloning', message: 'Cloning repository...' })}\n\n`);
       tempDir = await cloneRepository(owner, repo, defaultBranch, sessionId);
+      
+      res.write(`data: ${JSON.stringify({ type: 'progress', stage: 'chunking', message: 'Processing code chunks...' })}\n\n`);
       codeChunks = await chunkRepository(owner, repo, sessionId);
-      await embedAndUpsertChunks(owner, repo, sessionId);
+      
+      res.write(`data: ${JSON.stringify({ type: 'progress', stage: 'embedding', message: 'Generating embeddings...' })}\n\n`);
+      await embedAndUpsertChunks(owner, repo, sessionId, (progress) => {
+        res.write(`data: ${JSON.stringify({ type: 'progress', ...progress })}\n\n`);
+      });
     } else {
+      res.write(`data: ${JSON.stringify({ type: 'progress', stage: 'complete', message: 'Using existing embeddings' })}\n\n`);
       console.log(`✅ Reusing existing namespace: ${namespace}`);
     }
 
     // Fetch directory tree
+    res.write(`data: ${JSON.stringify({ type: 'progress', stage: 'tree', message: 'Fetching directory structure...' })}\n\n`);
     const nestedTree = await fetchRepoTree(owner, repo, defaultBranch);
 
-    res.json({
-      metadata: {
-        name: repoData.name,
-        description: repoData.description,
-        defaultBranch,
-        stars: repoData.stargazers_count,
-        forks: repoData.forks_count,
-      },
-      directoryTree: nestedTree,
-      codeChunks,
-      clonedPath: tempDir,
-      needsProcessing: !namespaceExists
-    });
+    // Send final response
+    res.write(`data: ${JSON.stringify({
+      type: 'complete',
+      data: {
+        metadata: {
+          name: repoData.name,
+          description: repoData.description,
+          defaultBranch,
+          stars: repoData.stargazers_count,
+          forks: repoData.forks_count,
+        },
+        directoryTree: nestedTree,
+        codeChunks,
+        clonedPath: tempDir,
+        needsProcessing: !namespaceExists
+      }
+    })}\n\n`);
+
+    res.end();
   } catch (error) {
     const { status, message } = error as { status: number; message: string };
-    res.status(status).json({ error: message });
+    res.write(`data: ${JSON.stringify({ type: 'error', error: message })}\n\n`);
+    res.end();
   }
 });
 
