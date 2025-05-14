@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+
 import OpenAI from 'openai';
 import { randomUUID } from 'crypto';
 import { 
@@ -11,14 +12,19 @@ import {
   checkNamespaceExists, 
   chunkRepository,
   embedAndUpsertChunks,
-  initializeEnvironment 
+  initializeEnvironment,
 } from './workspaces/workspaceHelpers.ts';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { b } from '../baml_client/index.js'
-import { FileMetadata, PlanSection } from '../baml_client/types.js'
+import { FileMetadata } from '../baml_client/types.js'
+import { getCodeChunks, initializeDatabase } from './db/index.ts';
 
-dotenv.config({ path: '../.env' });
+dotenv.config();
 initializeEnvironment();
+initializeDatabase().catch(error => {
+  console.error('Failed to initialize database:', error);
+  process.exit(1);
+});
 
 const app = express();
 const port = 3001;
@@ -51,6 +57,12 @@ interface LessonPlan {
   lessons: Lesson[];
 }
 
+app.get('/api/chunks', async (req: Request, res: Response) => {
+  const { namespace } = req.query;
+  const chunks = await getCodeChunks(namespace as string);
+  res.json(chunks);
+});
+
 // POST /api/createWorkspace
 app.post('/api/createWorkspace', async (req: Request, res: Response) => {
   try {
@@ -65,19 +77,21 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
     const namespace = `${owner}_${repo}`;
 
     // Check if namespace exists in Pinecone
-    // TODO: Implement codebase update check
     const namespaceExists = await checkNamespaceExists(namespace);
     let tempDir: string | null = null;
+    let codeChunks: any[] = [];
 
     // Fetch repository metadata
     const repoData = await fetchRepoMetadata(owner, repo);
     const defaultBranch = repoData.default_branch;
-    const codeChunks: string[] = []
 
-    // Only embed codebase if namespace doesn't already exist
-    if (!namespaceExists) {
+    // Try to get chunks from Postgres
+    codeChunks = await getCodeChunks(namespace);
+
+    if (!namespaceExists || codeChunks.length === 0) {
+      // If namespace doesn't exist, process everything
       tempDir = await cloneRepository(owner, repo, defaultBranch, sessionId);
-      await chunkRepository(owner, repo, sessionId);
+      codeChunks = await chunkRepository(owner, repo, sessionId);
       await embedAndUpsertChunks(owner, repo, sessionId);
     } else {
       console.log(`✅ Reusing existing namespace: ${namespace}`);
@@ -95,7 +109,7 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
         forks: repoData.forks_count,
       },
       directoryTree: nestedTree,
-      codeChunks: codeChunks,
+      codeChunks,
       clonedPath: tempDir,
       needsProcessing: !namespaceExists
     });

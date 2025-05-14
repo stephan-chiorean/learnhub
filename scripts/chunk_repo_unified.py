@@ -9,12 +9,30 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import re
 import sys
+import time
+from rich.console import Console
+from rich.panel import Panel
 
 from code_splitter import TiktokenSplitter, Language
 from tree_sitter_languages import get_parser
 import tree_sitter_languages
 print("📦 tree_sitter_languages is loaded from:", tree_sitter_languages.__file__)
 
+# Progress tracking
+start_time = time.time()
+console = Console()
+
+def emit_progress(stage: str, message: str, progress: Optional[float] = None, subtree: Optional[str] = None) -> None:
+    """Emit a progress event as JSON."""
+    progress_event = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.%fZ", time.gmtime()),
+        "stage": stage,
+        "message": message,
+        "elapsed": time.time() - start_time,
+        "progress": progress,
+        "subtree": subtree
+    }
+    print(json.dumps(progress_event))
 
 # Get the script's directory
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -37,6 +55,8 @@ TREE_SITTER_EXTENSIONS = {
     '.tsx': 'tsx',
     '.jsx': 'tsx',
     '.java': 'java',
+    '.cjs': 'typescript',  # Add CommonJS files
+    '.baml': 'typescript',  # Add BAML files
 }
 
 # Dynamically load tree-sitter languages
@@ -57,9 +77,9 @@ except Exception as e:
     print(f"Warning: Failed to load tree-sitter languages: {e}")
     print("Tree-sitter based chunking will be disabled")
 
+# Constants for non-code files
 NON_CODE_EXTENSIONS = {
     'Dockerfile': 'dockerfile',
-    '.json': 'config',
     '.yaml': 'config',
     '.yml': 'config',
     '.toml': 'config',
@@ -141,7 +161,19 @@ def chunk_with_tree_sitter(content: str, language: str, file_path: str, base_dir
     
     # Define the node types to look for based on language
     if language in ['typescript', 'tsx']:
-        node_types = ['function_declaration', 'method_definition', 'class_declaration']
+        node_types = [
+            'function_declaration',
+            'method_definition',
+            'class_declaration',
+            'interface_declaration',
+            'type_alias_declaration',
+            'enum_declaration',
+            'variable_declaration',
+            'export_statement',
+            'import_statement',
+            'jsx_element',
+            'jsx_self_closing_element'
+        ]
     elif language == 'java':
         node_types = ['method_declaration', 'class_declaration']
     else:
@@ -156,6 +188,10 @@ def chunk_with_tree_sitter(content: str, language: str, file_path: str, base_dir
             # Try to get function/class name
             function_name = None
             if node.type in ['function_declaration', 'method_definition', 'method_declaration']:
+                name_node = node.child_by_field_name('name')
+                if name_node:
+                    function_name = name_node.text.decode('utf8')
+            elif node.type in ['class_declaration', 'interface_declaration', 'type_alias_declaration', 'enum_declaration']:
                 name_node = node.child_by_field_name('name')
                 if name_node:
                     function_name = name_node.text.decode('utf8')
@@ -180,6 +216,24 @@ def chunk_with_tree_sitter(content: str, language: str, file_path: str, base_dir
             process_node(child)
 
     process_node(tree.root_node)
+    
+    # If no chunks were found, create a single chunk for the entire file
+    if not chunks:
+        chunks.append(CodeChunk(
+            id=str(uuid.uuid4()),
+            file_path=relative_path,
+            file_name=os.path.basename(file_path),
+            relative_dir=os.path.dirname(relative_path),
+            extension=os.path.splitext(file_path)[1].lower(),
+            type=ChunkType.CODE.value,
+            text=content,
+            start_line=1,
+            end_line=len(content.splitlines()),
+            size=len(content),
+            is_test_file=is_test_file(file_path),
+            language=language
+        ))
+    
     return chunks
 
 def chunk_code_file(file_path: str, base_dir: str) -> List[Chunk]:
@@ -190,7 +244,7 @@ def chunk_code_file(file_path: str, base_dir: str) -> List[Chunk]:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
     except Exception as e:
-        print(f"Error reading file {file_path}: {e}")
+        emit_progress("error", f"Error reading file {file_path}: {e}")
         return []
 
     # Handle code-splitter languages
@@ -220,8 +274,30 @@ def chunk_code_file(file_path: str, base_dir: str) -> List[Chunk]:
     # Handle tree-sitter languages
     elif extension in TREE_SITTER_EXTENSIONS:
         language = TREE_SITTER_EXTENSIONS[extension]
-        return chunk_with_tree_sitter(content, language, file_path, base_dir)
+        chunks = chunk_with_tree_sitter(content, language, file_path, base_dir)
+        if not chunks:
+            emit_progress("skipped", f"No chunks generated for {file_path} using tree-sitter")
+        return chunks
     
+    # For any other code-like file, create a single chunk
+    elif extension in ['.baml', '.cjs'] or file_path.endswith('.baml'):
+        relative_path = get_relative_path(file_path, base_dir)
+        return [CodeChunk(
+            id=str(uuid.uuid4()),
+            file_path=relative_path,
+            file_name=os.path.basename(file_path),
+            relative_dir=os.path.dirname(relative_path),
+            extension=extension,
+            type=ChunkType.CODE.value,
+            text=content,
+            start_line=1,
+            end_line=len(content.splitlines()),
+            size=len(content),
+            is_test_file=is_test_file(file_path),
+            language='typescript'  # Default to typescript for these files
+        )]
+    
+    emit_progress("skipped", f"Unsupported code file extension: {extension} for {file_path}")
     return []
 
 def chunk_markdown(content: str, file_path: str, base_dir: str) -> List[Chunk]:
@@ -296,71 +372,98 @@ def chunk_config_file(content: str, file_path: str, base_dir: str) -> List[Chunk
     )]
 
 def process_file(file_path: str, base_dir: str) -> tuple[List[Chunk], List[Chunk]]:
-    """Process a single file and return code and non-code chunks."""
     code_chunks = []
     non_code_chunks = []
+    relative_path = os.path.relpath(file_path, base_dir)
+    relative_dir = os.path.dirname(relative_path)
     
+    emit_progress("processing", f"Starting to process file: {relative_path}", subtree=relative_dir)
+
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
     except Exception as e:
-        print(f"Error reading file {file_path}: {e}")
+        emit_progress("error", f"Error reading file {relative_path}: {str(e)}", subtree=relative_dir)
         return [], []
 
     file_name = os.path.basename(file_path)
     extension = os.path.splitext(file_path)[1].lower()
-    # Handle code files
+
     if extension in CODE_SPLITTER_EXTENSIONS or extension in TREE_SITTER_EXTENSIONS:
+        emit_progress("processing", f"Processing code file: {relative_path}", subtree=relative_dir)
         code_chunks.extend(chunk_code_file(file_path, base_dir))
+        if not code_chunks:
+            emit_progress("skipped", f"No chunks generated for code file: {relative_path}", subtree=relative_dir)
+        else:
+            emit_progress("complete", f"Processed code file: {relative_path}", subtree=relative_dir)
     
-    # Handle non-code files
     elif extension in NON_CODE_EXTENSIONS:
+        emit_progress("processing", f"Processing non-code file: {relative_path}", subtree=relative_dir)
         if extension == '.md':
             non_code_chunks.extend(chunk_markdown(content, file_path, base_dir))
-        elif extension in ['.json', '.yaml', '.yml', '.toml', '.env']:
+        elif extension in ['.yaml', '.yml', '.toml', '.env']:
             non_code_chunks.extend(chunk_config_file(content, file_path, base_dir))
+        if not non_code_chunks:
+            emit_progress("skipped", f"No chunks generated for non-code file: {relative_path}", subtree=relative_dir)
+        else:
+            emit_progress("complete", f"Processed non-code file: {relative_path}", subtree=relative_dir)
+
     elif file_name == 'Dockerfile':
+        emit_progress("processing", f"Processing Dockerfile: {relative_path}", subtree=relative_dir)
         non_code_chunks.extend(chunk_dockerfile(content, file_path, base_dir))
+        if not non_code_chunks:
+            emit_progress("skipped", f"No chunks generated for Dockerfile: {relative_path}", subtree=relative_dir)
+        else:
+            emit_progress("complete", f"Processed Dockerfile: {relative_path}", subtree=relative_dir)
+    else:
+        emit_progress("skipped", f"Unsupported file type: {relative_path}", subtree=relative_dir)
 
     return code_chunks, non_code_chunks
 
 def chunk_repository(repo_path: str, output_file: str, error_file: str) -> None:
-    print(f"Chunking repository: {repo_path}")
-
-    print(f"🔍 Checking repository path: {repo_path}")
-
     if not os.path.exists(repo_path):
-        print(f"❌ ERROR: Path does not exist: {repo_path}")
+        console.print("[red]Error: Path does not exist[/red]")
         return
 
     if not os.path.isdir(repo_path):
-        print(f"❌ ERROR: Path is not a directory: {repo_path}")
+        console.print("[red]Error: Path is not a directory[/red]")
         return
-
-    """Main function to chunk a repository."""
-    contents = os.listdir(repo_path)
-    print(f"✅ Directory exists and contains {len(contents)} items:")
-    for item in contents:
-        print(f"  - {item}")
-
-    print(f"📦 Starting to walk files recursively...\n")
+    
     code_chunks = []
     non_code_chunks = []
     errors = []
+    processed_files = set()
     
+    # Process files
     for root, _, files in os.walk(repo_path):
+        subtree = os.path.relpath(root, repo_path)
+        subtree_code_chunks = 0
+        subtree_non_code_chunks = 0
+        
         for file in files:
             file_path = os.path.join(root, file)
             try:
                 file_code_chunks, file_non_code_chunks = process_file(file_path, repo_path)
                 code_chunks.extend(file_code_chunks)
                 non_code_chunks.extend(file_non_code_chunks)
+                subtree_code_chunks += len(file_code_chunks)
+                subtree_non_code_chunks += len(file_non_code_chunks)
+                if file_code_chunks or file_non_code_chunks:
+                    processed_files.add(os.path.relpath(file_path, repo_path))
             except Exception as e:
                 errors.append({
                     'file_path': os.path.relpath(file_path, repo_path),
                     'error': str(e)
                 })
-                print(f"Error processing file {file_path}: {e}")
+        
+        # Only show subtree info if we found chunks
+        if subtree_code_chunks > 0 or subtree_non_code_chunks > 0:
+            console.print(Panel(
+                f"[bold green]Subtree: {subtree}[/bold green]\n"
+                f"Code chunks: [yellow]{subtree_code_chunks}[/yellow]\n"
+                f"Non-code chunks: [blue]{subtree_non_code_chunks}[/blue]",
+                border_style="green"
+            ))
 
     # Write output files
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
@@ -370,41 +473,45 @@ def chunk_repository(repo_path: str, output_file: str, error_file: str) -> None:
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump([chunk.to_dict() for chunk in code_chunks + non_code_chunks], f, indent=2)
 
-    # ALSO write code-only chunks
+    # Write code-only chunks
     code_output_file = output_file.replace('.json', '.code.json')
     with open(code_output_file, 'w', encoding='utf-8') as f:
         json.dump([chunk.to_dict() for chunk in code_chunks], f, indent=2)
 
-    # Optionally: write non-code-only chunks
+    # Write non-code-only chunks
     non_code_output_file = output_file.replace('.json', '.noncode.json')
     with open(non_code_output_file, 'w', encoding='utf-8') as f:
         json.dump([chunk.to_dict() for chunk in non_code_chunks], f, indent=2)
     
-    # Write errors to error file
+    # Write errors
     with open(error_file, 'w', encoding='utf-8') as f:
         json.dump(errors, f, indent=2)
 
-    print(f"✅ Processed {len(code_chunks)} code chunks and {len(non_code_chunks)} non-code chunks")
-    print(f"✅ Output written to: {output_file}")
-    print(f"✅ Errors written to: {error_file}")
+    # Print final summary
+    console.print(Panel(
+        f"[bold green]Repository Processing Complete[/bold green]\n"
+        f"Total code chunks: [yellow]{len(code_chunks)}[/yellow]\n"
+        f"Total non-code chunks: [blue]{len(non_code_chunks)}[/blue]\n"
+        f"Total errors: [red]{len(errors)}[/red]\n"
+        f"Total time: [cyan]{time.time() - start_time:.2f}s[/cyan]",
+        border_style="green"
+    ))
+
+    # Print list of processed files
+    console.print("\n[bold]Processed Files:[/bold]")
+    for file_path in sorted(processed_files):
+        console.print(f"✅ {file_path}")
 
 if __name__ == "__main__":
-    # Comment out current implementation
-    # if len(sys.argv) != 4:
-    #     print('Usage: python chunk_repo_unified.py <repoDir> <outputFile> <errorFile>')
-    #     sys.exit(1)
-    #     
-    # repo_path = sys.argv[1]
-    # output_file = sys.argv[2]
-    # error_file = sys.argv[3]
+    if len(sys.argv) != 4:
+        print('Usage: python3 chunk_repo_unified.py <repoDir> <outputFile> <errorFile>')
+        sys.exit(1)
+        
+    repo_path = sys.argv[1]
+    output_file = sys.argv[2]
+    error_file = sys.argv[3]
     
-    # Hardcoded paths for testing
-    repo_path = "/tmp/walkthrough/stephan-chiorean_PromptVaultAdmin"
-    output_file = "/tmp/walkthrough/PromptVaultAdmin_chunks.json"
-    code_output_file = output_file.replace('.json', '.code.json')
-    error_file = "/tmp/walkthrough/PromptVaultAdmin_errors.json"
-    
-    print(f"Testing with hardcoded paths:")
+    print(f"Processing repository:")
     print(f"Repo path: {repo_path}")
     print(f"Output file: {output_file}")
     print(f"Error file: {error_file}")
