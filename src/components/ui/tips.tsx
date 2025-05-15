@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, Lightbulb, BookOpen } from 'lucide-react';
+import { Lightbulb } from 'lucide-react';
 
 interface TipsProps {
   onHide: () => void;
@@ -7,44 +7,26 @@ interface TipsProps {
 
 const Tips: React.FC<TipsProps> = ({ onHide }) => {
   return (
-    <div className="p-4 bg-orange-50 rounded-lg border border-orange-200 mx-4 mt-2">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-semibold text-orange-700">Tips for Better Responses</h3>
+    <div className="bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 m-4">
+      <div className="flex items-start gap-3">
+        <Lightbulb className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-1" />
+        <div className="flex-1">
+          <h3 className="text-lg font-display font-semibold text-blue-900 dark:text-blue-200 mb-2">
+            Tips for better results
+          </h3>
+          <ul className="list-disc list-inside space-y-2 text-blue-800 dark:text-blue-300">
+            <li>Add relevant files as context using the file picker below</li>
+            <li>Be specific about what you want to understand or modify</li>
+            <li>Ask about specific functions, classes, or patterns</li>
+            <li>Request explanations of complex code sections</li>
+          </ul>
+        </div>
         <button
           onClick={onHide}
-          className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
         >
-          Hide
+          ✕
         </button>
-      </div>
-      <div className="space-y-4">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-orange-100 rounded-lg">
-            <Brain className="w-5 h-5 text-orange-600" />
-          </div>
-          <div>
-            <h4 className="font-medium text-gray-800">Add Context</h4>
-            <p className="text-gray-600 text-sm">Select relevant files to help the AI understand your codebase better</p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-orange-100 rounded-lg">
-            <Lightbulb className="w-5 h-5 text-orange-600" />
-          </div>
-          <div>
-            <h4 className="font-medium text-gray-800">Be Specific</h4>
-            <p className="text-gray-600 text-sm">Ask detailed questions about specific parts of the code</p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-orange-100 rounded-lg">
-            <BookOpen className="w-5 h-5 text-orange-600" />
-          </div>
-          <div>
-            <h4 className="font-medium text-gray-800">Code Examples</h4>
-            <p className="text-gray-600 text-sm">Include code snippets or file paths in your questions</p>
-          </div>
-        </div>
       </div>
     </div>
   );

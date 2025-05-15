@@ -44,17 +44,17 @@ interface FileNodeData {
 const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
   const isRoot = !data.parentPath;
   return (
-    <div className={`px-4 py-2 rounded-lg shadow-sm border cursor-pointer select-none ${
+    <div className={`px-4 py-2 rounded-lg shadow-sm border cursor-pointer select-none h-full flex items-center justify-center ${
       data.type === 'directory'
         ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30'
-        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+        : 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100/80 dark:hover:bg-blue-900/30'
     }`}>
       {!isRoot && <Handle type="target" position={Position.Top} id="target" />}
-      <div className="flex items-center">
-        <div className="mr-2 flex-shrink-0">
+      <div className="flex flex-col items-center justify-center text-center">
+        <div className="mb-3 flex-shrink-0 scale-125">
           {getFileIcon(data.label, data.type === 'directory' ? 'tree' : 'blob')}
         </div>
-        <span className={`text-sm font-medium truncate ${data.type === 'file' ? getFileColor(data.label) : 'text-orange-500 dark:text-orange-400'}`}>
+        <span className={`text-base font-medium truncate max-w-[140px] ${data.type === 'file' ? getFileColor(data.label) : 'text-orange-500 dark:text-orange-400'}`}>
           {data.label}
         </span>
       </div>
@@ -102,8 +102,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
     }
   }, [owner, repo, fetchDirectoryTree, isLoading])
 
-  const NODE_VERTICAL_SPACING = 120;
-  const CHILD_HORIZONTAL_SPACING = 300;
+  const NODE_VERTICAL_SPACING = 240;
+  const CHILD_HORIZONTAL_SPACING = 240;
 
   const createNode = useCallback(
     (
@@ -126,7 +126,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
         extent = 'parent';
       } else {
         // Root nodes: global position
-        x = index * 250;
+        x = index * 280;
         y = 0;
         nodeParent = undefined;
         extent = undefined;
@@ -149,8 +149,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
         parentNode: nodeParent,
         extent,
         style: {
-          width: 200,
-          height: 40,
+          width: 160,
+          height: 160,
         },
       };
     },
@@ -292,9 +292,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
             type="text"
             value={workspaceAlias}
             onChange={(e) => setWorkspaceAlias(e.target.value)}
-            className="text-lg font-semibold text-gray-700 dark:text-gray-200 bg-transparent border-b border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-orange-500 focus:outline-none px-2 py-1 transition-colors"
+            className="text-lg font-display text-gray-700 dark:text-gray-200 bg-transparent border-b border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-orange-500 focus:outline-none px-2 py-1 transition-colors min-w-[200px]"
             placeholder="Workspace alias"
-            size={workspaceAlias.length || 20}
           />
           <div className="flex items-center gap-3">
             <button

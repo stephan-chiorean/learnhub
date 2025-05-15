@@ -56,11 +56,6 @@ const CodeViewer: React.FC = () => {
   }
 
   useEffect(() => {
-    console.log('Current path:', path);
-    console.log('Current file path:', currentFile?.path);
-  }, [path, currentFile]);
-
-  useEffect(() => {
     let interval: NodeJS.Timeout;
     if (typeof aiSummary === 'string' && aiSummary.startsWith('Generating summary')) {
       interval = setInterval(() => {

@@ -3,6 +3,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Input } from './ui/input';
 import { useWorkspace, CodeChunk } from '../context/WorkspaceContext';
 import { getFileIcon } from '../utils/fileIcons';
+import { Search } from 'lucide-react';
 import Fuse from 'fuse.js';
 
 interface TreeNode {
@@ -184,7 +185,7 @@ const ContextPopover: React.FC<ContextPopoverProps> = ({ onSelect }) => {
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[400px] p-0 shadow-xl border border-gray-200 rounded-lg"
+        className="w-[400px] p-0 shadow-xl border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50/80 dark:bg-blue-900/20"
         align="start"
         side="top"
         sideOffset={8}
@@ -194,14 +195,13 @@ const ContextPopover: React.FC<ContextPopoverProps> = ({ onSelect }) => {
           zIndex: 50
         }}
       >
-        <div className="px-4 pt-3 pb-2 border-b bg-white sticky top-0 z-10">
-          <div className="text-xs text-gray-500 font-semibold mb-1">Add files, folders, docs...</div>
+        <div className="px-4 pt-3 pb-2 border-b border-blue-200 dark:border-blue-800 bg-blue-50/80 dark:bg-blue-900/20 sticky top-0 z-10">
           <Input
             ref={inputRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search files, folders, functions..."
-            className="bg-gray-50 border-0 text-sm placeholder:text-gray-400"
+            placeholder="Add files, folders, docs..."
+            className="h-8 text-sm bg-transparent border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-blue-400 dark:placeholder:text-blue-500 text-blue-900 dark:text-blue-100 caret-orange-500 dark:caret-orange-400"
           />
         </div>
         <div className="overflow-y-auto" style={{ height: 'calc(400px - 60px)' }}>
@@ -213,21 +213,21 @@ const ContextPopover: React.FC<ContextPopoverProps> = ({ onSelect }) => {
                 setIsOpen(false);
                 setSearch('');
               }}
-              className="w-full px-3 py-2 text-left hover:bg-gray-100 flex items-center gap-2 text-sm"
+              className="w-full px-3 py-2 text-left hover:bg-blue-100/50 dark:hover:bg-blue-800/30 flex items-center gap-2 text-sm border-b border-blue-200/50 dark:border-blue-800/50 last:border-0"
             >
               {getItemIcon(item)}
               <span className="flex-1 flex items-center min-w-0">
-                <span className="truncate text-gray-800 font-medium">
+                <span className="truncate text-blue-900 dark:text-blue-200 font-medium">
                   {getItemName(item)}
                 </span>
-                <span className="ml-2 text-xs text-gray-400 truncate" style={{ maxWidth: 180 }}>
+                <span className="ml-2 text-xs text-blue-600/70 dark:text-blue-400/70 truncate" style={{ maxWidth: 180 }}>
                   {getItemDisplayPath(item)}
                 </span>
               </span>
             </button>
           ))}
           {searchResults.length === 0 && search && (
-            <div className="px-3 py-2 text-sm text-gray-500">
+            <div className="px-3 py-2 text-sm text-blue-700/70 dark:text-blue-300/70">
               No matching files, folders, or functions found
             </div>
           )}

@@ -191,10 +191,12 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const chatButton = document.querySelector('[aria-label="Open Chat"]');
+      const chatButton = document.querySelector('[aria-label="Ask AI"]');
+      const popover = document.querySelector('[role="dialog"]');
       if (chatRef.current && 
           !chatRef.current.contains(event.target as Node) && 
-          !(chatButton && chatButton.contains(event.target as Node))) {
+          !(chatButton && chatButton.contains(event.target as Node)) &&
+          !(popover && popover.contains(event.target as Node))) {
         onOpenChange(false);
       }
     }
@@ -213,6 +215,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
       className={`fixed right-0 top-14 bottom-0 bg-white dark:bg-gray-800 border-l border-gray-100 dark:border-gray-700 shadow-lg transition-all duration-300 ease-in-out transform ${
         isOpen ? 'translate-x-0' : 'translate-x-full'
       } w-[800px]`}
+      style={{ transform: isOpen ? 'translateX(0)' : 'translateX(100%)' }}
     >
       <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
         <h2 className="text-xl font-display text-orange-700 dark:text-orange-400">Ask AI</h2>
