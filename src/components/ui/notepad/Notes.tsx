@@ -72,7 +72,7 @@ const Notes: React.FC<NotesProps> = ({ isExpanded }) => {
     onBlur: () => setIsFocused(false),
     editorProps: {
       attributes: {
-        class: 'font-["Gaegu"] text-lg min-h-[calc(100vh-8rem)] focus:outline-none',
+        class: 'font-display text-lg min-h-[calc(100vh-8rem)] focus:outline-none',
       },
       handleKeyDown: (view, event): boolean => {
         if (event.key === 'Tab') {

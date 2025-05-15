@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useParams } from 'react-router-dom'
 import { useWorkspace } from '../context/WorkspaceContext'
+import { useTheme } from '../context/ThemeContext'
 import Workspace from '../components/Workspace'
 import CodeViewer from './CodeViewer'
 import CourseConsole from './CourseConsole'
@@ -15,6 +16,7 @@ const MainContent: React.FC<MainContentProps> = ({ isSidebarOpen }) => {
   const [repoUrl, setRepoUrl] = useState('')
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const { mode } = useTheme()
 
   const handleStartLearning = () => {
     // Reset error state
@@ -49,7 +51,7 @@ const MainContent: React.FC<MainContentProps> = ({ isSidebarOpen }) => {
   }
 
   return (
-    <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : ''} pt-14 min-h-screen bg-gray-50 flex flex-col items-center justify-center w-full`}>
+    <main className={`main-content ${isSidebarOpen ? 'sidebar-open' : ''} pt-14 min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center w-full`}>
       <div className="flex flex-col items-center justify-center w-full max-w-4xl px-4">
         {/* Walkthrough Logo */}
         <div className="mb-10 flex items-center">
@@ -59,28 +61,28 @@ const MainContent: React.FC<MainContentProps> = ({ isSidebarOpen }) => {
             <path d="M2 2l7.586 7.586"></path>
             <circle cx="11" cy="11" r="2"></circle>
           </svg>
-          <div className="ml-4 text-4xl font-medium">
+          <div className="ml-4 text-4xl font-medium dark:text-white">
             Walk<span className="text-orange-500">through</span>
           </div>
         </div>
         
         {/* Search Input */}
         <div className="search-container w-full">
-          <div className="search-input flex items-center w-full px-4 py-3 rounded-full border border-gray-200">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="search-input flex items-center w-full px-4 py-3 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 dark:text-gray-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input 
               type="text" 
               placeholder="Paste GitHub repository URL (e.g., https://github.com/owner/repo)" 
-              className="w-full text-sm text-gray-700 bg-transparent outline-none"
+              className="w-full text-sm text-gray-700 dark:text-gray-200 bg-transparent outline-none placeholder-gray-400 dark:placeholder-gray-500"
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleStartLearning()}
             />
           </div>
           {error && (
-            <div className="mt-2 text-sm text-red-500">
+            <div className="mt-2 text-sm text-red-500 dark:text-red-400">
               {error}
             </div>
           )}
@@ -89,7 +91,7 @@ const MainContent: React.FC<MainContentProps> = ({ isSidebarOpen }) => {
         {/* Start Learning Button */}
         <div className="flex justify-center w-full mt-6">
           <button 
-            className="start-button w-fit py-3 px-8 rounded-full text-white font-medium shadow-sm bg-orange-500 hover:bg-orange-600 transition-colors"
+            className="start-button w-fit py-3 px-8 rounded-full text-white font-medium shadow-sm bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700 transition-colors"
             onClick={handleStartLearning}
           >
             Start Learning

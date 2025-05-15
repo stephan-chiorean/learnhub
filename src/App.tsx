@@ -10,6 +10,7 @@ import Sidebar from './components/Sidebar'
 import useSidebar from './hooks/useSidebar'
 import { WorkspaceProvider } from './context/WorkspaceContext'
 import { WalkthroughProvider } from './context/WalkthroughContext'
+import { ThemeProvider } from './context/ThemeContext'
 
 const AppContent: React.FC<{ isSidebarOpen: boolean; toggleSidebar: () => void }> = ({ isSidebarOpen, toggleSidebar }) => {
   const [showHeader, setShowHeader] = useState(true);
@@ -21,7 +22,7 @@ const AppContent: React.FC<{ isSidebarOpen: boolean; toggleSidebar: () => void }
   }, [location]);
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
       <Sidebar isOpen={isSidebarOpen} />
       <div className="flex-1 flex flex-col overflow-hidden">
         {showHeader && <Header onMenuClick={toggleSidebar} />}
@@ -41,13 +42,15 @@ const App: React.FC = () => {
   const { isSidebarOpen, toggleSidebar } = useSidebar()
 
   return (
-    <WorkspaceProvider>
-      <WalkthroughProvider>
-        <Router>
-          <AppContent isSidebarOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
-        </Router>
-      </WalkthroughProvider>
-    </WorkspaceProvider>
+    <ThemeProvider>
+      <WorkspaceProvider>
+        <WalkthroughProvider>
+          <Router>
+            <AppContent isSidebarOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
+          </Router>
+        </WalkthroughProvider>
+      </WorkspaceProvider>
+    </ThemeProvider>
   )
 }
 

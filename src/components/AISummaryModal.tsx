@@ -21,7 +21,7 @@ interface AISummaryModalProps {
   isGenerating?: boolean
 }
 
-const fontClass = "font-['Gaegu'] text-lg text-gray-700";
+const fontClass = "font-display text-lg text-gray-700";
 
 const AISummaryModal: React.FC<AISummaryModalProps> = ({
   isOpen,
@@ -47,7 +47,7 @@ const AISummaryModal: React.FC<AISummaryModalProps> = ({
           <div className="mt-4 flex justify-end gap-2">
             <button
               onClick={() => onOpenChange(false)}
-              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg"
+              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-display text-lg shadow-md hover:shadow-lg"
             >
               Cancel
             </button>
@@ -55,7 +55,7 @@ const AISummaryModal: React.FC<AISummaryModalProps> = ({
               <button
                 onClick={onAddNote}
                 disabled={isGenerating}
-                className={`px-6 py-2 rounded-lg transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg ${
+                className={`px-6 py-2 rounded-lg transition-colors font-display text-lg shadow-md hover:shadow-lg ${
                   isGenerating
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-orange-500 text-white hover:bg-orange-600'
@@ -106,7 +106,7 @@ const AISummaryModal: React.FC<AISummaryModalProps> = ({
         <div className="mt-4 flex justify-end gap-2">
           <button
             onClick={() => onOpenChange(false)}
-            className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg"
+            className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-display text-lg shadow-md hover:shadow-lg"
           >
             Close
           </button>
@@ -114,7 +114,7 @@ const AISummaryModal: React.FC<AISummaryModalProps> = ({
             <button
               onClick={onAddNote}
               disabled={isGenerating}
-              className={`px-6 py-2 rounded-lg transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg ${
+              className={`px-6 py-2 rounded-lg transition-colors font-display text-lg shadow-md hover:shadow-lg ${
                 isGenerating
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-orange-500 text-white hover:bg-orange-600'

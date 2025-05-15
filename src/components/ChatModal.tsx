@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SiOpenai } from 'react-icons/si';
 import { useParams, useNavigate } from 'react-router-dom';
 import ContextPopover from './ContextPopover';
-import { Lightbulb, BookOpen, Brain, StickyNote, GitBranch } from 'lucide-react';
 import Tips from './ui/tips';
 import { getFileIcon } from '../utils/fileIcons';
+import { ScrollArea } from './ui/scroll-area';
 
 interface KeyComponent {
   name: string;
@@ -38,7 +37,7 @@ interface Context {
   metadata?: any;
 }
 
-const fontClass = "font-['Gaegu'] text-lg text-gray-700";
+const fontClass = "font-display text-lg text-gray-700";
 
 const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
@@ -50,6 +49,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
   const [showTips, setShowTips] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     console.log('Contexts state changed:', contexts);
@@ -189,24 +189,45 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
     );
   };
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const chatButton = document.querySelector('[aria-label="Open Chat"]');
+      if (chatRef.current && 
+          !chatRef.current.contains(event.target as Node) && 
+          !(chatButton && chatButton.contains(event.target as Node))) {
+        onOpenChange(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [onOpenChange]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30">
-      <div className="bg-white rounded-lg w-full max-w-2xl h-[80vh] flex flex-col">
-        <div className="p-4 border-b flex items-center justify-between">
-          <h2 className="text-xl font-['Gaegu'] text-orange-700">Ask AI</h2>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            ✕
-          </button>
-        </div>
+    <div 
+      ref={chatRef}
+      className={`fixed right-0 top-14 bottom-0 bg-white dark:bg-gray-800 border-l border-gray-100 dark:border-gray-700 shadow-lg transition-all duration-300 ease-in-out transform ${
+        isOpen ? 'translate-x-0' : 'translate-x-full'
+      } w-[800px]`}
+    >
+      <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
+        <h2 className="text-xl font-display text-orange-700 dark:text-orange-400">Ask AI</h2>
+        <button
+          onClick={() => onOpenChange(false)}
+          className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+        >
+          ✕
+        </button>
+      </div>
 
-        {showTips && <Tips onHide={() => setShowTips(false)} />}
-        
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {showTips && <Tips onHide={() => setShowTips(false)} />}
+      
+      <ScrollArea className="h-[calc(100vh-14rem)]">
+        <div className="p-4 space-y-4">
           {messages.map((message, index) => (
             <div
               key={index}
@@ -215,20 +236,20 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
               <div
                 className={`max-w-[80%] rounded-lg p-3 ${
                   message.role === 'user'
-                    ? 'bg-orange-100 text-orange-900'
-                    : 'bg-gray-100 text-gray-900'
+                    ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-900 dark:text-orange-100'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                 }`}
               >
                 {renderMessageContent(message.content)}
                 {message.relevantFiles && message.relevantFiles.length > 0 && (
-                  <div className="mt-2 text-sm text-gray-600">
-                    <p className="font-['Gaegu']">Relevant files:</p>
+                  <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    <p className="font-display">Relevant files:</p>
                     <ul className="list-disc list-inside">
                       {message.relevantFiles.map((file, i) => (
-                        <li key={i} className="font-['Gaegu']">
+                        <li key={i} className="font-display">
                           <button
                             onClick={() => handleFileClick(file.filePath)}
-                            className="text-orange-600 hover:text-orange-800 hover:underline"
+                            className="text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 hover:underline"
                           >
                             {file.filePath} ({(file.similarity * 100).toFixed(1)}% relevant)
                           </button>
@@ -242,72 +263,72 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
           ))}
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 rounded-lg p-3">
+              <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
                 <div className="flex space-x-2">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
+                  <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                  <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
                 </div>
               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
+      </ScrollArea>
 
-        <div className="p-4 border-t space-y-3">
-          <div className="flex items-center gap-2">
-            <ContextPopover onSelect={handleContextSelect} />
-          </div>
-          
-          {contexts.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {contexts.map((context, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1"
-                >
-                  {getFileIcon(context.path, context.type)}
-                  <span className="text-sm text-gray-700">{context.path}</span>
-                  <button
-                    onClick={() => handleRemoveContext(index)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="flex space-x-2">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
-              }}
-              placeholder="Ask anything about the code..."
-              rows={1}
-              style={{
-                resize: 'none',
-                minHeight: '44px', // matches previous input height
-                height: 'auto'
-              }}
-              className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 font-['Gaegu'] text-lg overflow-hidden"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed font-['Gaegu'] text-lg self-end"
-            >
-              Send
-            </button>
-          </form>
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 space-y-3">
+        <div className="flex items-center gap-2">
+          <ContextPopover onSelect={handleContextSelect} />
         </div>
+        
+        {contexts.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {contexts.map((context, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1"
+              >
+                {getFileIcon(context.path, context.type)}
+                <span className="text-sm text-gray-700 dark:text-gray-300">{context.path}</span>
+                <button
+                  onClick={() => handleRemoveContext(index)}
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex space-x-2">
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
+            placeholder="Ask anything about the code..."
+            rows={1}
+            style={{
+              resize: 'none',
+              minHeight: '44px',
+              height: 'auto'
+            }}
+            className="flex-1 p-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-orange-400 font-display text-lg overflow-hidden bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+          />
+          <button
+            type="submit"
+            disabled={isLoading || !input.trim()}
+            className="px-4 py-2 bg-orange-500 dark:bg-orange-600 text-white rounded-lg hover:bg-orange-600 dark:hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed font-display text-lg self-end"
+          >
+            Send
+          </button>
+        </form>
       </div>
     </div>
   );

@@ -131,7 +131,7 @@ const WalkthroughModal: React.FC<WalkthroughModalProps> = ({
         <div className="mt-6 flex justify-end">
           <button
             onClick={handleStartWalkthrough}
-            className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-['Gaegu'] text-lg shadow-md hover:shadow-lg"
+            className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-display text-lg shadow-md hover:shadow-lg"
           >
             Generate
           </button>

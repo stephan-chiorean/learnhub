@@ -109,7 +109,7 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start">
                     <div className="space-y-2 flex-1">
-                      <div className="text-lg font-['Gaegu'] text-gray-700 leading-tight">
+                      <div className="text-lg font-display text-gray-700 leading-tight">
                         {truncateText(annotation.content)}
                       </div>
                       {annotation.tags && annotation.tags.length > 0 && (

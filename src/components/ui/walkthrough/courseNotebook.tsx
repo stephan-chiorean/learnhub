@@ -15,7 +15,7 @@ export const ProgressSlider: React.FC<ProgressSliderProps> = ({ totalSteps, comp
 
   return (
     <div className="flex items-center gap-2 w-48">
-      <span className="text-sm text-gray-600 font-['Gaegu']">
+      <span className="text-sm text-gray-600 font-display">
         Progress
       </span>
       <Progress value={progress} className="h-2" />
@@ -128,19 +128,19 @@ const CourseNotepad: React.FC<CourseNotepadProps> = ({
   return (
     <div 
       ref={notepadRef}
-      className={`fixed right-0 top-14 bottom-0 bg-white border-l border-gray-100 shadow-lg transition-all duration-300 ease-in-out transform ${
+      className={`fixed right-0 top-14 bottom-0 bg-white dark:bg-gray-800 border-l border-gray-100 dark:border-gray-700 shadow-lg transition-all duration-300 ease-in-out transform ${
         isOpen ? 'translate-x-0' : 'translate-x-full'
       } ${isExpanded ? 'w-screen max-w-full' : 'w-[800px]'}`}
     >
-      <div className="flex items-center justify-between p-4 border-b border-gray-100">
+      <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
           >
-            {isExpanded ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            {isExpanded ? <Minimize2 className="w-5 h-5 text-gray-600 dark:text-gray-300" /> : <Maximize2 className="w-5 h-5 text-gray-600 dark:text-gray-300" />}
           </button>
-          <h2 className="text-lg font-semibold text-gray-700">Course Notes</h2>
+          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Course Notes</h2>
         </div>
         <SegmentedControl
           options={viewOptions}
@@ -156,26 +156,26 @@ const CourseNotepad: React.FC<CourseNotepadProps> = ({
           <ScrollArea className={`h-[calc(100vh-4rem)] ${isExpanded ? 'max-w-[1200px] mx-auto' : ''}`}>
             <div className={`p-4 space-y-4 ${isExpanded ? 'max-w-[1200px] mx-auto' : ''}`}>
               {savedLessons.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-[calc(100vh-8rem)] text-gray-400">
+                <div className="flex flex-col items-center justify-center h-[calc(100vh-8rem)] text-gray-400 dark:text-gray-500">
                   <div className="text-4xl mb-4">📚</div>
-                  <p className="font-['Gaegu'] text-lg">Save lessons to add them to your notepad</p>
+                  <p className="font-display text-lg">Save lessons to add them to your notepad</p>
                 </div>
               ) : (
                 savedLessons.map((lesson) => (
                   <div
                     key={lesson.id}
-                    className="bg-white border rounded-lg transition-colors duration-200 cursor-pointer shadow-sm hover:shadow-md border-gray-200"
+                    className="bg-white dark:bg-gray-800 border rounded-lg transition-colors duration-200 cursor-pointer shadow-sm hover:shadow-md border-gray-200 dark:border-gray-700"
                   >
                     <div className="p-4">
                       <div className="flex justify-between items-start mb-2">
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
                           {lessons.find(l => l.id === lesson.lessonId)?.title}
                         </div>
                       </div>
-                      <h3 className="text-lg font-semibold text-orange-700 mb-3">
+                      <h3 className="text-lg font-semibold text-orange-700 dark:text-orange-400 mb-3">
                         {lesson.title}
                       </h3>
-                      <div className="text-gray-700 space-y-2">
+                      <div className="text-gray-700 dark:text-gray-300 space-y-2">
                         {lesson.explanation.map((exp, index) => (
                           <div key={index} className="flex items-start">
                             <span className="mr-2">•</span>

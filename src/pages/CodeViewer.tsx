@@ -2,20 +2,18 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useWorkspace } from '../context/WorkspaceContext'
 import SyntaxHighlighter from 'react-syntax-highlighter'
-import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs'
+import { solarizedLight, atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs'
 import AnnotationModal from '../components/AnnotationModal'
 import Notepad from '../components/Notepad'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, ArrowLeft, Sun, Moon, Minus, Plus } from 'lucide-react'
 import { SiOpenai } from 'react-icons/si'
 import { PiNotePencilBold } from 'react-icons/pi'
+import { RiSparklingLine } from 'react-icons/ri'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip'
 import AISummaryModal from '../components/AISummaryModal'
 import { getLanguageFromPath } from '../utils/languageDetector'
 import { ScrollArea } from '../components/ui/scroll-area'
-import { CodeBlock } from '../components/ui/walkthrough/code-block'
-import AnnotationsSidebar from '../components/AnnotationsSidebar'
-import { Button } from '../components/ui/button'
-import { Lightbulb, BookOpen, Brain, StickyNote } from 'lucide-react'
+import { useTheme } from '../context/ThemeContext'
 
 const CodeViewer: React.FC = () => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -44,6 +42,8 @@ const CodeViewer: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isNotepadOpen, setIsNotepadOpen] = useState(false)
   const notepadRef = useRef<HTMLDivElement>(null)
+  const { mode } = useTheme();
+  const [fontSize, setFontSize] = useState(14);
 
   interface SummaryJSON {
     title: string
@@ -342,6 +342,14 @@ const CodeViewer: React.FC = () => {
     console.log('Rendering Notepad with notes:', notes);
   }, [notes]);
 
+  const handleZoomIn = () => {
+    setFontSize(prev => Math.min(prev + 2, 24));
+  };
+
+  const handleZoomOut = () => {
+    setFontSize(prev => Math.max(prev - 2, 10));
+  };
+
   if (isLoading) {
     return (
       <div className="flex-1 overflow-auto p-6">
@@ -381,20 +389,7 @@ const CodeViewer: React.FC = () => {
                 onClick={handleBackClick}
                 className="flex items-center text-gray-600 hover:text-gray-900 mr-4"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 mr-2"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                  />
-                </svg>
+                <ArrowLeft className="h-5 w-5 mr-2" />
                 Back to Workspace
               </button>
               <h1 className="text-2xl font-bold">
@@ -407,7 +402,7 @@ const CodeViewer: React.FC = () => {
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => setIsNotepadOpen(!isNotepadOpen)}
-                      className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                      className="flex items-center justify-center w-10 h-10 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
                     >
                       <PiNotePencilBold className="w-5 h-5" />
                     </button>
@@ -422,9 +417,9 @@ const CodeViewer: React.FC = () => {
                   <TooltipTrigger asChild>
                     <button
                       onClick={handleAISummary}
-                      className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                      className="flex items-center justify-center w-10 h-10 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
                     >
-                      <SiOpenai className="w-5 h-5" />
+                      <RiSparklingLine className="w-5 h-5" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -432,34 +427,95 @@ const CodeViewer: React.FC = () => {
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <button
-                onClick={handleCopyFile}
-                className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
-                title="Copy file"
-              >
-                {isCopying ? (
-                  <Check className="w-5 h-5 text-green-600" />
-                ) : (
-                  <Copy className="w-5 h-5" />
-                )}
-              </button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={handleCopyFile}
+                      className="flex items-center justify-center w-10 h-10 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
+                    >
+                      {isCopying ? (
+                        <Check className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <Copy className="w-5 h-5" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Copy file</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
           <div className="flex items-center mb-4">
             <h2 className="text-lg font-semibold">{currentFile?.path}</h2>
           </div>
           <div 
-            className="bg-white rounded-lg shadow p-4 relative"
+            className={`relative rounded-lg border border-gray-300 ${mode === 'dark' ? 'bg-[#282c34]' : 'bg-[#f8f8f8]'} overflow-hidden group mb-8`}
             onMouseUp={handleTextSelection}
             ref={codeRef}
           >
+            {/* Floating zoom controls */}
+            <div className="absolute top-2 right-2 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={handleZoomOut}
+                      className="p-1 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors shadow-sm"
+                      title="Zoom out"
+                    >
+                      <Minus className="w-4 h-4 text-white" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Zoom out</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={handleZoomIn}
+                      className="p-1 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors shadow-sm"
+                      title="Zoom in"
+                    >
+                      <Plus className="w-4 h-4 text-white" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Zoom in</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+
             <ScrollArea className="w-full overflow-x-auto">
               <SyntaxHighlighter
                 language={getLanguageFromPath(currentFile?.path || '')}
-                style={docco}
-                customStyle={{ margin: 0, padding: '1rem', minWidth: 'fit-content' }}
+                style={mode === 'dark' ? atomOneDark : solarizedLight}
+                customStyle={{
+                  margin: 0,
+                  padding: '1rem 1rem 0 1rem',
+                  background: mode === 'dark' ? '#282c34' : '#f8f8f8',
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                  fontSize: `${fontSize}px`,
+                  lineHeight: '1.5',
+                  height: 'calc(100vh - 240px)',
+                  maxHeight: 'none',
+                  overflowY: 'auto',
+                }}
                 showLineNumbers
                 wrapLines
+                lineNumberStyle={{
+                  color: mode === 'dark' ? '#636d83' : '#93a1a1',
+                  minWidth: '2.5em',
+                  paddingRight: '1em',
+                  textAlign: 'right',
+                  userSelect: 'none',
+                }}
                 lineProps={(lineNumber) => {
                   const style = { display: 'block' }
                   const { lines, selectedLines, hoveredLines, clickedLines } = getHighlightedLines()
@@ -488,7 +544,7 @@ const CodeViewer: React.FC = () => {
       </div>
       <div 
         ref={notepadRef}
-        className={`fixed right-0 top-14 bottom-0 bg-white border-l border-gray-100 shadow-lg transition-all duration-300 ease-in-out transform ${isNotepadOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed right-0 top-14 bottom-0 bg-white dark:bg-gray-800 border-l border-gray-100 dark:border-gray-700 shadow-lg transition-all duration-300 ease-in-out transform ${isNotepadOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
         <Notepad
           notes={notes}
