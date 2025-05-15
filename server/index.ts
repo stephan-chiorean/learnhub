@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs/promises';
 
 import OpenAI from 'openai';
 import { randomUUID } from 'crypto';
@@ -13,11 +15,12 @@ import {
   chunkRepository,
   embedAndUpsertChunks,
   initializeEnvironment,
+  intelligentFileSearch,
 } from './workspaces/workspaceHelpers.ts';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { b } from '../baml_client/index.js'
 import { FileMetadata } from '../baml_client/types.js'
-import { getCodeChunks, initializeDatabase } from './db/index.ts';
+import { getCodeChunks, initializeDatabase, pool } from './db/index.ts';
 
 dotenv.config();
 initializeEnvironment();
@@ -37,25 +40,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Add these type definitions before the endpoint
-interface LessonStep {
-  title: string;
-  filePath: string | null;
-  startLine: number | null;
-  endLine: number | null;
-  code: string | null;
-  explanation: string;
-}
-
-interface Lesson {
-  title: string;
-  steps: LessonStep[];
-}
-
-interface LessonPlan {
-  sectionId: string;
-  lessons: Lesson[];
-}
+const pinecone = new Pinecone({
+  apiKey: process.env.PINECONE_API_KEY as string,
+  controllerHostUrl: 'https://api.pinecone.io'
+});
 
 app.get('/api/chunks', async (req: Request, res: Response) => {
   const { namespace } = req.query;
@@ -228,48 +216,206 @@ app.post('/api/generateSummary', async (req: Request, res: Response) => {
 // POST /api/chat
 app.post('/api/chat', async (req: Request, res: Response) => {
   try {
-    const { namespace, question } = req.body;
+    const { namespace, question, contexts } = req.body;
+    console.log('📝 Chat Request:', {
+      namespace,
+      question,
+      contexts: JSON.stringify(contexts, null, 2)
+    });
 
     if (!namespace || !question) {
+      console.log('❌ Missing required fields:', { namespace, question });
       return res.status(400).json({ error: 'Namespace and question are required' });
     }
 
+    // Ensure namespace is a string
+    const namespaceStr = String(namespace);
+
     if (!process.env.PINECONE_API_KEY || !process.env.PINECONE_INDEX) {
+      console.log('❌ Missing Pinecone configuration');
       return res.status(500).json({ error: 'Pinecone configuration is missing' });
     }
 
-    // Get embedding for the question
-    const embedding = await openai.embeddings.create({
-      model: 'text-embedding-ada-002',
-      input: question,
-      encoding_format: 'float'
-    });
+    // Use intelligent file search to find relevant files
+    console.log('🔍 Starting intelligent file search...');
+    const semanticFiles = await intelligentFileSearch(namespaceStr, question, contexts || [], pinecone);
+    console.log('📊 Semantic files found:', JSON.stringify(semanticFiles, null, 2));
 
-    // Query Pinecone
-    const pinecone = new Pinecone({
-      apiKey: process.env.PINECONE_API_KEY,
-      controllerHostUrl: 'https://api.pinecone.io'
-    });
+    // Get chunks from the context directory using SQL
+    const contextPath = contexts?.find((ctx: { type: string; path: string }) => ctx.type === 'tree')?.path;
+    console.log('🔍 Context path:', contextPath);
+    
+    let contextMatches: any[] = [];
+    let sqlRelevantFiles: Array<{ filePath: string; similarity: number }> = [];
+    
+    if (contextPath) {
+      // Normalize the context path
+      const normalizedContextPath = contextPath.replace(/^\/+/, '');
+      
+      // Query database for chunks from the context directory and related files
+      const result = await pool.query(
+        `WITH related_files AS (
+          -- Get files in the context directory
+          SELECT file_path, 1.0 as relevance
+          FROM code_chunks 
+          WHERE namespace = $1 
+          AND (
+            file_path = $2 
+            OR file_path LIKE $3
+            OR file_path LIKE $4
+          )
+          UNION
+          -- Get files that import or reference files in the context
+          SELECT DISTINCT c2.file_path, 0.8 as relevance
+          FROM code_chunks c1
+          JOIN code_chunks c2 ON c2.namespace = c1.namespace
+          WHERE c1.namespace = $1
+          AND (
+            c1.file_path = $2 
+            OR c1.file_path LIKE $3
+            OR c1.file_path LIKE $4
+          )
+          AND (
+            c2.text LIKE '%import%' || c1.file_name || '%'
+            OR c2.text LIKE '%require%' || c1.file_name || '%'
+            OR c2.text LIKE '%from%' || c1.file_name || '%'
+          )
+        )
+        SELECT c.*, rf.relevance
+        FROM code_chunks c
+        JOIN related_files rf ON c.file_path = rf.file_path
+        WHERE c.namespace = $1
+        ORDER BY rf.relevance DESC, c.start_line ASC`,
+        [
+          namespaceStr,
+          normalizedContextPath,
+          `${normalizedContextPath}/%`,
+          `%/${normalizedContextPath}/%`
+        ]
+      );
+      
+      // Extract unique file paths and their highest relevance scores
+      const fileRelevance = new Map<string, number>();
+      result.rows.forEach((row: { file_path: string; relevance: number }) => {
+        const currentRelevance = fileRelevance.get(row.file_path) || 0;
+        fileRelevance.set(row.file_path, Math.max(currentRelevance, row.relevance));
+      });
 
-    const index = pinecone.index(process.env.PINECONE_INDEX);
-    const queryResponse = await index.namespace(namespace).query({
-      vector: embedding.data[0].embedding,
-      topK: 10,
+      // Convert to array format
+      sqlRelevantFiles = Array.from(fileRelevance.entries()).map(([filePath, relevance]) => ({
+        filePath,
+        similarity: relevance
+      }));
+
+      contextMatches = result.rows.map((row: {
+        chunk_id: string;
+        file_path: string;
+        type: string;
+        text: string;
+        function_name: string | null;
+        start_line: number;
+        end_line: number;
+        relevance: number;
+      }) => ({
+        id: row.chunk_id,
+        score: row.relevance,
+        metadata: {
+          filePath: row.file_path,
+          type: row.type,
+          content: row.text,
+          functionName: row.function_name,
+          startLine: row.start_line,
+          endLine: row.end_line
+        }
+      }));
+    }
+
+    console.log('📊 Retrieved chunks from context:', contextMatches.length);
+    console.log('📊 Context chunks:', contextMatches.map(m => m.metadata?.filePath));
+
+    // Then, get chunks that might reference the context files using Pinecone
+    const semanticQueryResponse = await pinecone.index(process.env.PINECONE_INDEX).query({
+      vector: (await openai.embeddings.create({
+        model: 'text-embedding-ada-002',
+        input: question,
+        encoding_format: 'float'
+      })).data[0].embedding,
+      topK: 50,
       includeMetadata: true,
       includeValues: false
     });
 
-    // Format the chunks for the prompt
-    const formattedChunks = queryResponse.matches
-      .filter(match => match.metadata) // Filter out matches without metadata
+    // Filter out chunks we already have from context
+    const semanticMatches = semanticQueryResponse.matches
+      .filter(match => !contextMatches.some(cm => cm.id === match.id))
+      .slice(0, 10);
+
+    console.log('📊 Retrieved chunks from semantic search:', semanticMatches.length);
+
+    // Combine chunks, prioritizing context matches
+    const allMatches = [...contextMatches, ...semanticMatches];
+    console.log('📊 Total chunks:', allMatches.length);
+
+    // Combine and normalize relevance scores from both sources
+    const combinedRelevantFiles = new Map<string, { semantic: number; sql: number }>();
+    
+    // Add semantic scores
+    semanticFiles.forEach(file => {
+      combinedRelevantFiles.set(file.filePath, { 
+        semantic: file.similarity,
+        sql: 0
+      });
+    });
+    
+    // Add SQL scores
+    sqlRelevantFiles.forEach(file => {
+      const current = combinedRelevantFiles.get(file.filePath) || { semantic: 0, sql: 0 };
+      combinedRelevantFiles.set(file.filePath, {
+        ...current,
+        sql: file.similarity
+      });
+    });
+
+    // Calculate final scores with SQL relevance having higher weight
+    const finalRelevantFiles = Array.from(combinedRelevantFiles.entries())
+      .map(([filePath, scores]) => ({
+        filePath,
+        similarity: (scores.semantic * 0.3) + (scores.sql * 0.7) // SQL relevance has 70% weight
+      }))
+      .sort((a, b) => b.similarity - a.similarity);
+
+    // Filter files based on relevance thresholds
+    let filteredRelevantFiles = finalRelevantFiles;
+    
+    // If we have files with high relevance (>= 70%), only keep those
+    const highRelevanceFiles = finalRelevantFiles.filter(file => file.similarity >= 0.7);
+    if (highRelevanceFiles.length > 0) {
+      filteredRelevantFiles = highRelevanceFiles.slice(0, 5); // Max 5 high relevance files
+    } else {
+      // If no high relevance files, take top 2 most relevant
+      filteredRelevantFiles = finalRelevantFiles.slice(0, 2);
+    }
+
+    // Format chunks for the prompt
+    const formattedChunks = allMatches
+      .filter(match => match.metadata)
       .map(match => {
-        const metadata = match.metadata!; // We know it exists due to filter
+        const metadata = match.metadata!;
         return `File: ${metadata.filePath}\nType: ${metadata.type}\n${metadata.functionName ? `Function: ${metadata.functionName}\n` : ''}Content:\n${metadata.content}\n`;
       })
       .join('\n---\n');
 
-    // Create the prompt
-    const prompt = `Based on the following code chunks, ${question}\n\n${formattedChunks}\n\nPlease provide a structured response in JSON format with the following structure:
+    // Create the prompt with context mentions
+    const contextMentions = (contexts || []).map((ctx: { path: string; type: string; start_line?: number; end_line?: number }) => {
+      if (ctx.type === 'tree') return `Folder: ${ctx.path}`;
+      if (ctx.type === 'blob') return `File: ${ctx.path}`;
+      if (ctx.type === 'function') return `Function: ${ctx.path} [lines ${ctx.start_line}-${ctx.end_line}]`;
+      return '';
+    }).filter(Boolean);
+
+    console.log('📝 Context mentions:', contextMentions);
+
+    const prompt = `The user has selected the following context as most relevant:\n${contextMentions.join('\n')}\n\nHere are the most relevant code chunks:\n${formattedChunks}\n\nBased on all of the above, ${question}\n\nPlease provide a structured response in JSON format with the following structure:
     {
       "title": "A concise title for the response",
       "mainPurpose": "One paragraph explaining the main purpose or answer",
@@ -280,6 +426,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       "overallStructure": "One paragraph explaining the overall structure or flow"
     }`;
 
+    console.log('🤖 Sending request to OpenAI...');
     // Get response from OpenAI
     const response = await openai.chat.completions.create({
       model: "gpt-4",
@@ -300,11 +447,13 @@ app.post('/api/chat', async (req: Request, res: Response) => {
     try {
       const content = response.choices[0].message.content;
       if (!content) {
+        console.log('❌ Empty response from OpenAI');
         throw new Error('Empty response from OpenAI');
       }
       responseJson = JSON.parse(content);
+      console.log('✅ Successfully parsed OpenAI response');
     } catch (e) {
-      // If parsing fails, create a structured response from the raw text
+      console.log('❌ Error parsing OpenAI response:', e);
       responseJson = {
         title: "Code Explanation",
         mainPurpose: response.choices[0].message.content || "No response available",
@@ -313,17 +462,13 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       };
     }
 
+    console.log('📤 Sending response to client');
     res.json({ 
       response: JSON.stringify(responseJson),
-      relevantFiles: queryResponse.matches
-        .filter(match => match.metadata) // Filter out matches without metadata
-        .map(match => ({
-          filePath: match.metadata!.filePath,
-          similarity: match.score
-        }))
+      relevantFiles: filteredRelevantFiles
     });
   } catch (error) {
-    console.error('Error in chat endpoint:', error);
+    console.error('❌ Error in chat endpoint:', error);
     res.status(500).json({ error: 'Failed to process chat request' });
   }
 });
@@ -341,10 +486,6 @@ app.post('/api/plan', async (req: Request, res: Response) => {
     }
 
     // Fetch all files in the namespace from Pinecone
-    const pinecone = new Pinecone({
-      apiKey: process.env.PINECONE_API_KEY,
-      controllerHostUrl: 'https://api.pinecone.io'
-    });
     const index = pinecone.index(process.env.PINECONE_INDEX);
     // Use a dummy vector and large topK to fetch everything
     const queryResponse = await index.namespace(namespace).query({
@@ -511,30 +652,6 @@ Additional task-specific instructions:
     res.status(500).json({ error: 'Failed to generate lesson plan' });
   }
 });
-
-// Add type guard function
-function isLessonPlan(obj: any): obj is LessonPlan {
-  return (
-    obj &&
-    typeof obj.sectionId === 'string' &&
-    Array.isArray(obj.lessons) &&
-    obj.lessons.every((lesson: any) =>
-      lesson &&
-      typeof lesson.title === 'string' &&
-      Array.isArray(lesson.steps) &&
-      lesson.steps.every((step: any) =>
-        step &&
-        typeof step.title === 'string' &&
-        Array.isArray(step.explanation) &&
-        step.explanation.every((exp: any) => typeof exp === 'string') &&
-        (step.filePath === null || typeof step.filePath === 'string') &&
-        (step.startLine === null || typeof step.startLine === 'number') &&
-        (step.endLine === null || typeof step.endLine === 'number') &&
-        (step.code === null || typeof step.code === 'string')
-      )
-    )
-  );
-}
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);

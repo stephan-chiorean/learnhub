@@ -8,6 +8,7 @@ import { Pinecone } from '@pinecone-database/pinecone';
 import { Pool } from 'pg';
 import { getCodeChunks, saveCodeChunks } from '../db/index.ts';
 import cliProgress from 'cli-progress';
+import { openai } from '../utils/openai.js';
 
 const execAsync = promisify(exec);
 
@@ -500,4 +501,119 @@ export const embedAndUpsertChunks = async (
       reject(error);
     }
   });
+};
+
+// Helper function to perform intelligent file search
+export const intelligentFileSearch = async (
+  namespace: string,
+  query: string,
+  contexts: Array<{ path: string; type: string; start_line?: number; end_line?: number }>,
+  pinecone: any
+): Promise<Array<{ filePath: string; similarity: number; boost: number }>> => {
+  try {
+    // Get embedding for the query
+    const embedding = await openai.embeddings.create({
+      model: 'text-embedding-ada-002',
+      input: query,
+      encoding_format: 'float'
+    });
+
+    // Query Pinecone with a larger topK to get more candidates
+    const queryResponse = await pinecone.index(process.env.PINECONE_INDEX)
+      .namespace(namespace)
+      .query({
+        vector: embedding.data[0].embedding,
+        topK: 50,
+        includeMetadata: true,
+        includeValues: false
+      });
+
+    // Group matches by file path to calculate file-level relevance
+    const fileScores = new Map<string, { totalScore: number; count: number; matches: any[] }>();
+    
+    queryResponse.matches.forEach((match: any) => {
+      if (!match.metadata?.filePath) return;
+      
+      const filePath = match.metadata.filePath;
+      const current = fileScores.get(filePath) || { totalScore: 0, count: 0, matches: [] };
+      
+      current.totalScore += match.score || 0;
+      current.count += 1;
+      current.matches.push(match);
+      fileScores.set(filePath, current);
+    });
+
+    // Calculate file-level relevance scores
+    const fileRelevance = Array.from(fileScores.entries()).map(([filePath, data]) => ({
+      filePath,
+      similarity: data.totalScore / data.count,
+      matches: data.matches
+    }));
+
+    // Apply context-based boosting
+    const contextFunctions = contexts.filter(c => c.type === 'function');
+    const contextFiles = contexts.filter(c => c.type === 'blob');
+    const contextFolders = contexts.filter(c => c.type === 'tree');
+
+    const boostedFiles = fileRelevance.map(file => {
+      let boost = 0;
+      
+      // Check if file is in a context folder - using exact path matching
+      if (contextFolders.some(ctx => {
+        const normalizedFilePath = file.filePath.replace(/^\/+/, '');
+        const normalizedContextPath = ctx.path.replace(/^\/+/, '');
+        return normalizedFilePath.startsWith(normalizedContextPath + '/') || 
+               normalizedFilePath === normalizedContextPath;
+      })) {
+        boost += 1;
+        console.log(`📈 Boosting file ${file.filePath} due to context folder match`);
+      }
+      
+      // Check if file is directly selected - using exact path matching
+      if (contextFiles.some(ctx => {
+        const normalizedFilePath = file.filePath.replace(/^\/+/, '');
+        const normalizedContextPath = ctx.path.replace(/^\/+/, '');
+        return normalizedFilePath === normalizedContextPath;
+      })) {
+        boost += 2;
+        console.log(`📈 Boosting file ${file.filePath} due to direct file match`);
+      }
+      
+      // Check if file contains selected functions - using exact path and line matching
+      if (contextFunctions.some(ctx => {
+        const startLine = ctx.start_line ?? 0;
+        const endLine = ctx.end_line ?? 0;
+        const normalizedFilePath = file.filePath.replace(/^\/+/, '');
+        const normalizedContextPath = ctx.path.replace(/^\/+/, '');
+        const functionMatch = file.matches.find((m: any) => 
+          m.metadata.filePath.replace(/^\/+/, '') === normalizedContextPath &&
+          m.metadata.startLine <= endLine &&
+          m.metadata.endLine >= startLine
+        );
+        if (functionMatch) {
+          console.log(`📈 Boosting file ${file.filePath} due to function match`);
+        }
+        return functionMatch;
+      })) {
+        boost += 3;
+      }
+
+      // Calculate final score with reduced boost impact
+      const finalScore = file.similarity * (1 + (boost * 0.1)); // Reduced to 10% boost per level
+
+      return {
+        filePath: file.filePath,
+        similarity: finalScore,
+        boost
+      };
+    });
+
+    // Sort by final score and return top results
+    return boostedFiles
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 10);
+  } catch (error) {
+    console.error('Error in intelligent file search:', error);
+    return [];
+  }
 }; 

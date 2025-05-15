@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Input } from './ui/input';
 import { useWorkspace, CodeChunk } from '../context/WorkspaceContext';
-import { SiOpenai } from 'react-icons/si';
 import { getFileIcon } from '../utils/fileIcons';
 import Fuse from 'fuse.js';
 
@@ -25,46 +24,6 @@ interface SearchableItem {
 
 interface ContextPopoverProps {
   onSelect: (path: string, type: 'blob' | 'tree' | 'function', metadata?: CodeChunk) => void;
-}
-
-// Shared icon logic for context
-export function getContextIcon(path: string, type: 'blob' | 'tree' | 'function', function_name?: string) {
-  if (type === 'tree') {
-    // Filled orange folder
-    return (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-4 w-4 text-orange-500"
-        fill="currentColor"
-        viewBox="0 0 20 20"
-      >
-        <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-      </svg>
-    );
-  }
-  if (type === 'blob') {
-    if (path.endsWith('.tsx')) {
-      return <SiOpenai className="h-4 w-4 text-cyan-500" />;
-    }
-    return getFileIcon(path);
-  }
-  if (type === 'function') {
-    // Simple code icon </>
-    return (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-4 w-4 text-blue-500"
-        fill="none"
-        viewBox="0 0 20 20"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <polyline points="7 8 3 12 7 16" />
-        <polyline points="13 8 17 12 13 16" />
-      </svg>
-    );
-  }
-  return getFileIcon(path);
 }
 
 const ContextPopover: React.FC<ContextPopoverProps> = ({ onSelect }) => {
@@ -184,7 +143,7 @@ const ContextPopover: React.FC<ContextPopoverProps> = ({ onSelect }) => {
     setSearchResults(finalResults);
   }, [search, directoryTree, chunks]);
 
-  const getItemIcon = (item: SearchableItem) => getContextIcon(item.path, item.type, item.function_name);
+  const getItemIcon = (item: SearchableItem) => getFileIcon(item.path, item.type);
 
   // Helper to get the display name (last segment)
   const getItemName = (item: SearchableItem) => {

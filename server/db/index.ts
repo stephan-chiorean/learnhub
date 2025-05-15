@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 // Initialize Postgres pool
-const pool = new Pool({
+export const pool = new Pool({
   user: String(process.env.POSTGRES_USER),
   host: String(process.env.POSTGRES_HOST),
   database: String(process.env.POSTGRES_DB),

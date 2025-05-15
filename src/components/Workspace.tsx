@@ -49,15 +49,9 @@ const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
     }`}>
       {!isRoot && <Handle type="target" position={Position.Top} id="target" />}
       <div className="flex items-center">
-        {data.type === 'directory' ? (
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 flex-shrink-0 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-          </svg>
-        ) : (
-          <div className="mr-2 flex-shrink-0">
-            {getFileIcon(data.label)}
-          </div>
-        )}
+        <div className="mr-2 flex-shrink-0">
+          {getFileIcon(data.label, data.type === 'directory' ? 'tree' : 'blob')}
+        </div>
         <span className={`text-sm font-medium truncate ${data.type === 'file' ? getFileColor(data.label) : 'text-orange-500'}`}>
           {data.label}
         </span>

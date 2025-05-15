@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SiOpenai } from 'react-icons/si';
 import { useParams, useNavigate } from 'react-router-dom';
-import ContextPopover, { getContextIcon } from './ContextPopover';
+import ContextPopover from './ContextPopover';
 import { Lightbulb, BookOpen, Brain, StickyNote, GitBranch } from 'lucide-react';
 import Tips from './ui/tips';
 import { getFileIcon } from '../utils/fileIcons';
@@ -52,6 +52,10 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    console.log('Contexts state changed:', contexts);
+  }, [contexts]);
+
+  useEffect(() => {
     // Reset tips visibility when modal opens
     if (isOpen) {
       setShowTips(true);
@@ -100,6 +104,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
     setShowTips(false);
 
     try {
+      console.log('Contexts being sent in request:', contexts);
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -108,7 +113,14 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
         body: JSON.stringify({
           namespace: `${owner}_${repo}`,
           question: userMessage,
-          contexts: contexts.map(c => c.path)
+          contexts: contexts.map(c => ({
+            path: c.path,
+            type: c.type,
+            ...(c.metadata && {
+              start_line: c.metadata.start_line,
+              end_line: c.metadata.end_line
+            })
+          }))
         })
       });
 
@@ -254,11 +266,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onOpenChange }) => {
                   key={index}
                   className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1"
                 >
-                  {getContextIcon(
-                    context.path,
-                    context.type,
-                    context.metadata?.function_name
-                  )}
+                  {getFileIcon(context.path, context.type)}
                   <span className="text-sm text-gray-700">{context.path}</span>
                   <button
                     onClick={() => handleRemoveContext(index)}

@@ -1,10 +1,41 @@
 import React from 'react';
-import { SiPython, SiDocker, SiYaml, SiJavascript, SiTypescript, SiJson, SiMarkdown, SiHtml5, SiCss3 } from 'react-icons/si';
+import { SiPython, SiDocker, SiYaml, SiJavascript, SiTypescript, SiJson, SiMarkdown, SiHtml5, SiCss3, SiReact } from 'react-icons/si';
 import { FaFileCode } from 'react-icons/fa';
 
-export const getFileIcon = (fileName: string) => {
+export const getFileIcon = (fileName: string, type?: 'blob' | 'tree' | 'function') => {
+  if (type === 'tree') {
+    // Filled orange folder
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-4 w-4 text-orange-500"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+      >
+        <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+      </svg>
+    );
+  }
+  if (type === 'function') {
+    // Simple code icon </>
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-4 w-4 text-blue-500"
+        fill="none"
+        viewBox="0 0 20 20"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <polyline points="7 8 3 12 7 16" />
+        <polyline points="13 8 17 12 13 16" />
+      </svg>
+    );
+  }
   const extension = fileName.split('.').pop()?.toLowerCase();
-  
+  if (extension === 'tsx') {
+    return <SiReact className="w-4 h-4 text-cyan-500" />;
+  }
   switch (extension) {
     case 'py':
       return <SiPython className="w-4 h-4 text-blue-600" />;
