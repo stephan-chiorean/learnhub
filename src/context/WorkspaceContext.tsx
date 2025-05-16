@@ -55,6 +55,8 @@ interface WorkspaceContextType {
   addAnnotation: (annotation: Omit<Annotation, 'id'>) => void;
   removeAnnotation: (id: string) => void;
   setNamespace: (namespace: string) => void;
+  annotationsMap: Map<string, string>;
+  fetchAndSetAnnotation: (directoryPath: string) => Promise<void>;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
@@ -72,6 +74,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   });
   const [progress, setProgress] = useState<ProgressUpdate | null>(null);
   const [chunks, setChunks] = useState<CodeChunk[]>([]);
+  const [annotationsMap, setAnnotationsMapState] = useState<Map<string, string>>(new Map());
 
   // Effect to update localStorage when namespace changes
   useEffect(() => {
@@ -121,6 +124,13 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
                 setDirectoryTree(data.data.directoryTree);
                 const newNamespace = `${owner}_${repo}`;
                 setNamespaceState(newNamespace);
+                if (data.data.annotations) {
+                  const initialAnnotations = new Map<string, string>();
+                  for (const [path, annotation] of Object.entries(data.data.annotations)) {
+                    initialAnnotations.set(path, annotation as string);
+                  }
+                  setAnnotationsMapState(initialAnnotations);
+                }
                 workspaceCreated = true;
               } else if (data.type === 'error') {
                 setError(data.error);
@@ -200,6 +210,31 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     localStorage.setItem('workspaceNamespace', namespace);
   };
 
+  const fetchAndSetAnnotation = async (directoryPath: string) => {
+    if (annotationsMap.has(directoryPath)) return; // Already fetched
+
+    try {
+      const response = await fetch('/api/generateAnnotations', { // Assuming this API base URL is fine
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ directories: [directoryPath] }),
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch annotation for ${directoryPath}`);
+      }
+      const data = await response.json();
+      if (data.annotations && data.annotations[directoryPath]) {
+        setAnnotationsMapState(prevMap => new Map(prevMap).set(directoryPath, data.annotations[directoryPath]));
+      }
+    } catch (err) {
+      console.error(`Error fetching annotation for ${directoryPath}:`, err);
+      // Optionally set an error state or a placeholder annotation
+      setAnnotationsMapState(prevMap => new Map(prevMap).set(directoryPath, "Error fetching annotation."));
+    }
+  };
+
   return (
     <WorkspaceContext.Provider value={{
       directoryTree,
@@ -215,7 +250,9 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
       fetchChunks,
       addAnnotation,
       removeAnnotation,
-      setNamespace
+      setNamespace,
+      annotationsMap,
+      fetchAndSetAnnotation
     }}>
       {children}
     </WorkspaceContext.Provider>

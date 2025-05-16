@@ -27,6 +27,7 @@ import AtomLoader from '../../assets/AtomLoader.json'
 import EqualizerLoader from '../../assets/EqualizerLoader.json'
 import ClockLoading from '../../assets/ClockLoading.json'
 import LoadingRings from '../../assets/LoadingRings.json'
+import Lens from './ui/Lens'
 
 interface WorkspaceProps {
   isSidebarOpen: boolean
@@ -39,17 +40,29 @@ interface FileNodeData {
   isExpanded?: boolean
   children?: any[]
   parentPath?: string
+  annotation?: string
 }
 
-const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
+// Forward declaration for the new annotation node type's data
+interface HoverAnnotationNodeData {
+  text: string;
+  targetPosition: { x: number; y: number }; // To help position the arrow if needed internally
+  // We might pass more theme related things if the node is in a separate file
+}
+
+const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data, id }) => {
   const isRoot = !data.parentPath;
+
   return (
-    <div className={`px-4 py-2 rounded-lg shadow-sm border cursor-pointer select-none h-full flex items-center justify-center ${
-      data.type === 'directory'
-        ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30'
-        : 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100/80 dark:hover:bg-blue-900/30'
-    }`}>
+    <div 
+      className={`px-4 py-2 rounded-lg shadow-sm border cursor-pointer select-none h-full flex items-center justify-center transition-all duration-150 ease-in-out ${
+        data.type === 'directory'
+          ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30'
+          : 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100/80 dark:hover:bg-blue-900/30'
+      }`}
+    >
       {!isRoot && <Handle type="target" position={Position.Top} id="target" />}
+      
       <div className="flex flex-col items-center justify-center text-center">
         <div className="mb-3 flex-shrink-0 scale-125">
           {getFileIcon(data.label, data.type === 'directory' ? 'tree' : 'blob')}
@@ -58,19 +71,75 @@ const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data }) => {
           {data.label}
         </span>
       </div>
+      
       {data.type === 'directory' && <Handle type="source" position={Position.Bottom} id="source" />}
     </div>
   )
 }
 
+// Placeholder for the new HoverAnnotationNode - will be defined properly later
+const HoverAnnotationNodeComponent: React.FC<NodeProps<HoverAnnotationNodeData>> = ({ data }) => {
+  const { mode, theme: appTheme } = useTheme(); 
+  const ARROW_SIZE = 10; // Controls the size of the tail
+
+  return (
+    <div style={{
+      padding: '10px 15px',
+      fontFamily: appTheme.fonts.display.join(','),
+      fontSize: '1.1rem',
+      background: mode === 'dark' ? appTheme.colors.gray[700] : appTheme.colors.gray[100],
+      border: `1px solid ${mode === 'dark' ? appTheme.colors.gray[600] : appTheme.colors.gray[300]}`,
+      borderRadius: appTheme.borderRadius.md, // Rounded corners for the bubble
+      color: mode === 'dark' ? appTheme.colors.gray[50] : appTheme.colors.gray[800],
+      maxWidth: '220px',
+      minWidth: '150px',
+      textAlign: 'left',
+      position: 'relative', // Needed for the pseudo-element tail
+      boxShadow: appTheme.shadows.lg,
+    }} className="nodrag nopan">
+      {data.text.split('\n').slice(0,3).join('\n')}
+      
+      <div
+        style={{
+          position: 'absolute',
+          left: '20px',
+          bottom: '-8px',
+          width: '16px',
+          height: '8px',
+          backgroundColor: mode === 'dark' ? appTheme.colors.gray[700] : appTheme.colors.gray[100],
+          clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
+        }}
+      />
+    </div>
+  );
+};
+
 const nodeTypes: NodeTypes = {
   fileNode: FileNode,
+  hoverAnnotationNode: HoverAnnotationNodeComponent, // Register new type
+}
+
+interface HoveredNodeInfo {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
   const navigate = useNavigate()
-  const { directoryTree, isLoading, error, fetchDirectoryTree, progress } = useWorkspace()
+  const { 
+    directoryTree, 
+    isLoading: isWorkspaceLoading,
+    error: workspaceError,
+    fetchDirectoryTree, 
+    progress, 
+    annotationsMap,
+    fetchAndSetAnnotation
+  } = useWorkspace()
   const { mode, theme } = useTheme()
   const [workspaceAlias, setWorkspaceAlias] = useState(`${owner}/${repo}`)
   const [isWalkthroughOpen, setIsWalkthroughOpen] = useState(false)
@@ -84,26 +153,74 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const nodes = useMemo(() => Array.from(nodeMap.values()), [nodeMap])
   const edges = useMemo(() => Array.from(edgeMap.values()), [edgeMap])
 
-  const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState(nodes)
+  const [hoveredNodeInfo, setHoveredNodeInfo] = useState<HoveredNodeInfo | null>(null);
+  const [hoveredAnnotation, setHoveredAnnotation] = useState<string | null>(null);
+  const [hoveredFolderName, setHoveredFolderName] = useState<string | null>(null);
+  const [isLensMinimized, setIsLensMinimized] = useState(false);
+
+  const calculatedNodes = useMemo(() => {
+    let currentNodes = Array.from(nodeMap.values());
+    if (hoveredNodeInfo) {
+      const X_OFFSET_FROM_FOLDER_MIDLINE = 10; // How far right of folder's midline the bubble's effective anchor starts
+      const Y_OFFSET_ABOVE_FOLDER = 15;      // How much vertical gap above the folder
+      const TAIL_OFFSET_FROM_BUBBLE_LEFT = 20; // The 'left: 20px' style for the tail
+      const APPROX_ARROW_TIP_EFFECTIVE_HEIGHT = 10; // How much the tail extends below the bubble's bottom edge
+
+      // Estimate annotation box height - this is the trickiest part without rendering it first.
+      const APPROX_ANNOTATION_BOX_HEIGHT = 80; 
+
+      // Calculate the desired X for the left edge of the annotation bubble
+      const annotationNodeX = hoveredNodeInfo.x + (hoveredNodeInfo.width / 2) 
+                              + X_OFFSET_FROM_FOLDER_MIDLINE 
+                              - TAIL_OFFSET_FROM_BUBBLE_LEFT;
+
+      // Calculate the desired Y for the top edge of the annotation bubble
+      const annotationNodeY = hoveredNodeInfo.y 
+                              - APPROX_ANNOTATION_BOX_HEIGHT 
+                              - APPROX_ARROW_TIP_EFFECTIVE_HEIGHT 
+                              - Y_OFFSET_ABOVE_FOLDER;
+
+      // The point on the folder the tail aims for (e.g., top-center of the folder)
+      const targetPointOnFolderX = hoveredNodeInfo.x + hoveredNodeInfo.width / 2;
+      const targetPointOnFolderY = hoveredNodeInfo.y;
+
+      currentNodes.push({
+        id: 'hover-annotation', 
+        type: 'hoverAnnotationNode',
+        position: { x: annotationNodeX, y: annotationNodeY },
+        data: { 
+          text: hoveredNodeInfo.text, 
+          targetPosition: { x: targetPointOnFolderX, y: targetPointOnFolderY } 
+        },
+        draggable: false,
+        selectable: false,
+        style: { pointerEvents: 'none', zIndex: 1000 }, 
+      });
+    }
+    return currentNodes;
+  }, [nodeMap, hoveredNodeInfo]);
+
+  const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState(calculatedNodes)
   const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState(edges)
 
   useEffect(() => {
-    setReactFlowNodes(nodes)
-  }, [nodes, setReactFlowNodes])
+    setReactFlowNodes(calculatedNodes)
+  }, [calculatedNodes, setReactFlowNodes])
 
   useEffect(() => {
     setReactFlowEdges(edges)
   }, [edges, setReactFlowEdges])
 
   useEffect(() => {
-    if (owner && repo && !hasFetchedRef.current && !isLoading) {
+    if (owner && repo && !hasFetchedRef.current && !isWorkspaceLoading) {
       fetchDirectoryTree(owner, repo)
       hasFetchedRef.current = true
     }
-  }, [owner, repo, fetchDirectoryTree, isLoading])
+  }, [owner, repo, fetchDirectoryTree, isWorkspaceLoading])
 
   const NODE_VERTICAL_SPACING = 240;
-  const CHILD_HORIZONTAL_SPACING = 240;
+  const CHILD_HORIZONTAL_SPACING = 280;
+  const ANNOTATION_OFFSET_Y = 95;
 
   const createNode = useCallback(
     (
@@ -143,6 +260,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
           children: item.children || [],
           isExpanded: false,
           parentPath: parentId,
+          annotation: item.type === 'tree' ? annotationsMap.get(item.path) : undefined,
         },
         sourcePosition: Position.Bottom,
         targetPosition: Position.Top,
@@ -154,7 +272,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
         },
       };
     },
-    []
+    [annotationsMap]
   );
 
   useEffect(() => {
@@ -163,14 +281,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
       const newEdges = new Map<string, Edge>();
 
       directoryTree.forEach((item, index) => {
-        const node = createNode(item, null, index, directoryTree.length);
-        newNodes.set(node.id, node);
+        const dirNode = createNode(item, null, index, directoryTree.length);
+        newNodes.set(dirNode.id, dirNode);
       });
 
       setNodeMap(newNodes);
       setEdgeMap(newEdges);
     }
-  }, [directoryTree, createNode])
+  }, [directoryTree, createNode, annotationsMap]);
 
   const toggleFolder = useCallback(
     (node: Node) => {
@@ -183,7 +301,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
       const newNodes = new Map(nodeMap);
       const newEdges = new Map(edgeMap);
 
-      // Helper to remove all descendants of a node
       const removeDescendants = (parentId: string) => {
         const children = Array.from(newNodes.values()).filter(n => n.data.parentPath === parentId);
         children.forEach(child => {
@@ -196,13 +313,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
       };
 
       if (alreadyExpanded) {
-        // Collapse this node and remove its descendants
         removeDescendants(node.id);
-        newNodes.set(node.id, { ...node, data: { ...fileData, isExpanded: false } });
+        newNodes.set(node.id, { 
+          ...node, 
+          data: { 
+            ...fileData, 
+            isExpanded: false 
+          } 
+        });
         setNodeMap(newNodes);
         setEdgeMap(newEdges);
       } else {
-        // Collapse all siblings at this level and remove their descendants
         Array.from(newNodes.values())
           .filter(n => n.data.parentPath === parentPath && n.id !== node.id && (n.data as FileNodeData).isExpanded)
           .forEach(sibling => {
@@ -210,26 +331,40 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
             newNodes.set(sibling.id, { ...sibling, data: { ...sibling.data, isExpanded: false } });
           });
 
-        // Expand this node and add its children
         const siblingCount = fileData.children.length;
         fileData.children.forEach((child, index) => {
-          const childNode = createNode(child, node.id, index, siblingCount);
-          newNodes.set(childNode.id, childNode);
-          newEdges.set(`${node.id}-${childNode.id}`, {
-            id: `${node.id}-${childNode.id}`,
+          const childDirNode = createNode(child, node.id, index, siblingCount);
+          newNodes.set(childDirNode.id, childDirNode);
+          newEdges.set(`${node.id}-${childDirNode.id}`, {
+            id: `${node.id}-${childDirNode.id}`,
             source: node.id,
-            target: childNode.id,
+            target: childDirNode.id,
             type: 'smoothstep',
             animated: true,
             style: { stroke: '#f97316' },
           });
         });
-        newNodes.set(node.id, { ...node, data: { ...fileData, isExpanded: true } });
+        newNodes.set(node.id, { 
+          ...node, 
+          data: { 
+            ...fileData, 
+            isExpanded: true, 
+            annotation: annotationsMap.get(node.id) || fileData.annotation
+          } 
+        });
         setNodeMap(newNodes);
         setEdgeMap(newEdges);
+
+        const childrenDirectoriesToFetch = fileData.children
+          .filter(childItem => childItem.type === 'tree' && !annotationsMap.has(childItem.path))
+          .map(childItem => childItem.path);
+        
+        childrenDirectoriesToFetch.forEach(path => {
+          fetchAndSetAnnotation(path);
+        });
       }
     },
-    [nodeMap, edgeMap, createNode]
+    [nodeMap, edgeMap, createNode, annotationsMap, fetchAndSetAnnotation]
   )
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -243,7 +378,21 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
     }
   }, [toggleFolder, owner, repo, navigate]);
 
-  if (isLoading) {
+  const onNodeMouseEnter = useCallback((event: React.MouseEvent, node: Node) => {
+    if (node.type === 'fileNode' && (node.data as FileNodeData).type === 'directory' && (node.data as FileNodeData).annotation) {
+      setHoveredAnnotation((node.data as FileNodeData).annotation!);
+      setHoveredFolderName((node.data as FileNodeData).label);
+      setIsLensMinimized(false);
+    }
+  }, []);
+
+  const onNodeMouseLeave = useCallback((event: React.MouseEvent, node: Node) => {
+    setHoveredAnnotation(null);
+    setHoveredFolderName(null);
+    setIsLensMinimized(true);
+  }, []);
+
+  if (isWorkspaceLoading && !directoryTree.length) {
     return (
       <div className={`flex-1 overflow-auto pt-14 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
         <div className="flex flex-col items-center justify-center h-full">
@@ -282,7 +431,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
     );
   }
 
-  if (error) return <div className={`flex-1 overflow-auto ${isSidebarOpen ? 'ml-64' : 'ml-0'} dark:text-gray-200`}>{error}</div>;
+  if (workspaceError) return <div className={`flex-1 overflow-auto ${isSidebarOpen ? 'ml-64' : 'ml-0'} dark:text-gray-200`}>{workspaceError}</div>;
 
   return (
     <div className={`flex-1 overflow-auto pt-14 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
@@ -333,8 +482,20 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
               panOnScroll
               zoomOnScroll={false}
               panOnDrag={false}
+              onNodeMouseEnter={onNodeMouseEnter}
+              onNodeMouseLeave={onNodeMouseLeave}
+              elementsSelectable={false}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              selectNodesOnDrag={false}
             >
               <Background color={mode === 'dark' ? theme.colors.gray[700] : theme.colors.gray[300]} gap={16} />
+              <Lens 
+                text={hoveredAnnotation} 
+                folderName={hoveredFolderName || undefined} 
+                isMinimized={isLensMinimized}
+                onMinimizeChange={setIsLensMinimized}
+              />
             </ReactFlow>
           </div>
           <div className="flex justify-between items-center mt-8 mb-6">

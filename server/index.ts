@@ -105,6 +105,41 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify({ type: 'progress', stage: 'tree', message: 'Fetching directory structure...' })}\n\n`);
     const nestedTree = await fetchRepoTree(owner, repo, defaultBranch);
 
+    // Generate annotations for top-level directories
+    const topLevelAnnotations: Record<string, string> = {};
+    if (nestedTree && nestedTree.length > 0) {
+      for (const item of nestedTree) {
+        if (item.type === 'tree') { // 'tree' usually means directory
+          try {
+            const completion = await openai.chat.completions.create({
+              model: "gpt-3.5-turbo",
+              messages: [
+                {
+                  role: "system",
+                  content: "You are an expert technical writer. Given a directory path, provide a very brief, one-sentence description of its likely purpose or the type of files it might contain. Focus on common conventions in software projects."
+                },
+                {
+                  role: "user",
+                  content: `Provide a one-sentence description for the top-level directory: "${item.name}" (path: ${item.path})`
+                }
+              ],
+              temperature: 0.3,
+              max_tokens: 50,
+            });
+            const description = completion.choices[0]?.message?.content?.trim();
+            if (description) {
+              topLevelAnnotations[item.path] = description;
+            } else {
+              topLevelAnnotations[item.path] = `General purpose directory: ${item.name}`;
+            }
+          } catch (e) {
+            console.error(`Error generating annotation for ${item.path}:`, e);
+            topLevelAnnotations[item.path] = `Could not generate annotation for ${item.path}.`;
+          }
+        }
+      }
+    }
+
     // Send final response
     res.write(`data: ${JSON.stringify({
       type: 'complete',
@@ -119,7 +154,8 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
         directoryTree: nestedTree,
         codeChunks,
         clonedPath: tempDir,
-        needsProcessing: !namespaceExists
+        needsProcessing: !namespaceExists,
+        annotations: topLevelAnnotations,
       }
     })}\n\n`);
 
@@ -650,6 +686,52 @@ Additional task-specific instructions:
   } catch (error) {
     console.error('Error generating lesson plan:', error);
     res.status(500).json({ error: 'Failed to generate lesson plan' });
+  }
+});
+
+// POST /api/generateAnnotations
+app.post('/api/generateAnnotations', async (req: Request, res: Response) => {
+  try {
+    const { directories } = req.body; // Expecting an array of directory paths
+
+    if (!directories || !Array.isArray(directories) || directories.length === 0) {
+      return res.status(400).json({ error: 'An array of directory paths is required.' });
+    }
+
+    const annotations: Record<string, string> = {};
+
+    for (const dirPath of directories) {
+      try {
+        // For simplicity, we'll generate a generic description based on the path.
+        // In a real scenario, you might analyze files within the directory.
+        const completion = await openai.chat.completions.create({
+          model: "gpt-3.5-turbo", // Cheaper model for simple annotations
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert technical writer. Given a directory path, provide a very brief, one-sentence description of its likely purpose or the type of files it might contain. Focus on common conventions in software projects."
+            },
+            {
+              role: "user",
+              content: `Provide a one-sentence description for the directory: "${dirPath}"`
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 50,
+        });
+        const description = completion.choices[0]?.message?.content?.trim() || `General purpose directory: ${dirPath}`;
+        annotations[dirPath] = description;
+      } catch (error) {
+        console.error(`Error generating annotation for ${dirPath}:`, error);
+        annotations[dirPath] = `Could not generate annotation for ${dirPath}.`;
+      }
+    }
+
+    res.json({ annotations });
+
+  } catch (error) {
+    console.error('Error in /api/generateAnnotations:', error);
+    res.status(500).json({ error: 'Failed to generate annotations.' });
   }
 });
 
