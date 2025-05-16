@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import { Minimize2, Folder, Aperture } from 'lucide-react';
+import { Folder, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface LensProps {
@@ -8,122 +8,37 @@ interface LensProps {
   folderName?: string;
   isMinimized: boolean;
   onMinimizeChange: (minimized: boolean) => void;
+  onHoverChange: (hovered: boolean) => void;
 }
 
-const Lens: React.FC<LensProps> = ({ text, folderName, isMinimized, onMinimizeChange }) => {
+const Lens: React.FC<LensProps> = ({ text, folderName, isMinimized, onMinimizeChange, onHoverChange }) => {
   const { mode, theme } = useTheme();
   const [isHovered, setIsHovered] = useState(false);
-  const [showContent, setShowContent] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const lensRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isMinimized) {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
-        if (!isHovered) {
-          setShowContent(false);
-          onMinimizeChange(true);
-        }
-      }, 4000);
-    } else {
-      setShowContent(false);
-    }
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [isMinimized, isHovered, onMinimizeChange]);
 
   const handleMouseEnter = () => {
     setIsHovered(true);
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
+    onHoverChange(true);
+    onMinimizeChange(false);
   };
 
   const handleMouseLeave = () => {
     setIsHovered(false);
-  };
-
-  const handleMinimizeFromButton = () => {
-    setShowContent(false);
-    onMinimizeChange(true);
-  };
-
-  const handleAnimationComplete = (definition: any) => {
-    if (definition === 'open' && !isMinimized) {
-      setShowContent(true);
-    } else if (definition === 'closed' && isMinimized) {
-      setShowContent(false);
-    }
-  };
-
-  const lensVariants = {
-    open: {
-      scale: 1,
-      opacity: 1,
-      width: '400px',
-      height: 'auto',
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30,
-        mass: 0.8
-      }
-    },
-    closed: {
-      scale: 1,
-      opacity: 1,
-      width: '48px',
-      height: '48px',
-      transition: {
-        type: "spring",
-        stiffness: 400,
-        damping: 35,
-        mass: 0.8
-      }
-    }
-  };
-
-  const backgroundVariants = {
-    animate: {
-      scale: [1, 1.02, 1],
-      rotate: [0, 0.5, 0],
-      transition: {
-        duration: 4,
-        repeat: Infinity,
-        ease: "easeInOut"
-      }
-    }
-  };
-
-  const shineVariants = {
-    animate: {
-      backgroundPosition: ['0% 0%', '100% 100%'],
-      transition: {
-        duration: 3,
-        repeat: Infinity,
-        ease: "linear"
-      }
-    }
+    onHoverChange(false);
   };
 
   const contentVariants = {
-    initial: { opacity: 0 },
+    initial: { opacity: 0, y: 10 },
     animate: { 
       opacity: 1, 
+      y: 0,
       transition: {
-        delay: 0.15,
         duration: 0.2,
         ease: "easeOut"
       }
     },
     exit: { 
-      opacity: 0, 
+      opacity: 0,
+      y: 10,
       transition: {
         duration: 0.15,
         ease: "easeIn"
@@ -131,83 +46,42 @@ const Lens: React.FC<LensProps> = ({ text, folderName, isMinimized, onMinimizeCh
     }
   };
 
-  const LensIcon = () => (
-    <motion.div
-      whileHover={{ scale: 1.1 }}
-      whileTap={{ scale: 0.95 }}
-      className="cursor-pointer"
-    >
-      <Aperture className="w-6 h-6 text-primary-500" />
-    </motion.div>
-  );
+  const containerVariants = {
+    initial: { scale: 1 },
+    hover: { 
+      scale: 1.02,
+      transition: {
+        duration: 0.2,
+        ease: "easeOut"
+      }
+    }
+  };
 
   return (
-    <motion.div 
-      layout
-      className="absolute bottom-8 right-8 z-50"
-      initial="closed"
-      animate={isMinimized ? "closed" : "open"}
-      variants={lensVariants}
-      style={{ pointerEvents: 'auto' }}
-      ref={lensRef}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onAnimationComplete={handleAnimationComplete}
-    >
-      <motion.div
-        layout
-        className="relative rounded-xl shadow-2xl overflow-hidden w-full h-full"
-        style={{
-          background: mode === 'dark' ? theme.colors.gray[800] : theme.colors.gray[50],
-          border: `1px solid ${mode === 'dark' ? theme.colors.gray[700] : theme.colors.gray[200]}`,
-          color: mode === 'dark' ? theme.colors.gray[100] : theme.colors.gray[900],
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          pointerEvents: 'auto'
-        }}
-      >
-        {/* Shiny background effect */}
-        <motion.div
-          className="absolute inset-0"
-          variants={shineVariants}
+    <AnimatePresence>
+      {!isMinimized && (
+        <motion.div 
+          className="absolute bottom-8 right-8 z-50 w-[400px] cursor-pointer"
+          initial="initial"
           animate="animate"
-          style={{
-            background: `linear-gradient(45deg, 
-              transparent 0%, 
-              ${mode === 'dark' ? theme.colors.primary[400] : theme.colors.primary[300]} 25%, 
-              transparent 50%, 
-              ${mode === 'dark' ? theme.colors.primary[400] : theme.colors.primary[300]} 75%, 
-              transparent 100%)`,
-            backgroundSize: '200% 200%',
-            opacity: 0.1,
-            pointerEvents: 'none'
-          }}
-        />
-
-        {/* Animated background */}
-        <motion.div
-          className="absolute inset-0"
-          variants={backgroundVariants}
-          animate="animate"
-          style={{ pointerEvents: 'none' }}
+          exit="exit"
+          variants={contentVariants}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
-          <div 
-            className="absolute inset-0 opacity-10"
+          <motion.div
+            className="relative rounded-xl shadow-2xl overflow-hidden w-full"
+            variants={containerVariants}
+            initial="initial"
+            whileHover="hover"
             style={{
-              background: `radial-gradient(circle at center, ${mode === 'dark' ? theme.colors.primary[400] : theme.colors.primary[300]} 0%, transparent 70%)`,
+              background: mode === 'dark' ? theme.colors.gray[800] : theme.colors.gray[50],
+              border: `1px solid ${mode === 'dark' ? theme.colors.gray[700] : theme.colors.gray[200]}`,
+              color: mode === 'dark' ? theme.colors.gray[100] : theme.colors.gray[900],
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
             }}
-          />
-        </motion.div>
-
-        {isMinimized ? (
-          <div 
-            className="w-full h-full flex items-center justify-center"
-            style={{ pointerEvents: 'none' }}
           >
-            <LensIcon />
-          </div>
-        ) : (
-          <>
             {/* Header */}
             <div className="relative flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2">
@@ -227,47 +101,51 @@ const Lens: React.FC<LensProps> = ({ text, folderName, isMinimized, onMinimizeCh
                   )}
                 </AnimatePresence>
               </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors font-display text-xs shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
+              >
+                Step Through
+                <Sparkles className="w-3.5 h-3.5" />
+              </motion.button>
             </div>
 
-            {/* Content - Render conditionally based on showContent */}
-            {showContent && (
-              <div className="relative p-4">
-                <AnimatePresence mode="wait" initial={false}>
-                  {text ? (
-                    <motion.div 
-                      key="content"
-                      layout
-                      className="text-lg font-display leading-relaxed"
-                      variants={contentVariants}
-                      initial="initial"
-                      animate="animate"
-                      exit="exit"
-                    >
-                      {text}
-                    </motion.div>
-                  ) : (
-                    <motion.div 
-                      key="empty"
-                      layout
-                      className="flex flex-col items-center justify-center py-8 text-center text-gray-500 dark:text-gray-400"
-                      variants={contentVariants}
-                      initial="initial"
-                      animate="animate"
-                      exit="exit"
-                    >
-                      <Folder className="w-16 h-16 text-primary-500 mb-4" fill="currentColor" />
-                      <p className="text-lg font-display">
-                        Hover over a folder to see more context
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-          </>
-        )}
-      </motion.div>
-    </motion.div>
+            {/* Content */}
+            <div className="relative p-4">
+              <AnimatePresence mode="wait" initial={false}>
+                {text ? (
+                  <motion.div 
+                    key="content"
+                    className="text-lg font-display leading-relaxed"
+                    variants={contentVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                  >
+                    {text}
+                  </motion.div>
+                ) : (
+                  <motion.div 
+                    key="empty"
+                    className="flex flex-col items-center justify-center py-8 text-center text-gray-500 dark:text-gray-400"
+                    variants={contentVariants}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                  >
+                    <Folder className="w-16 h-16 text-primary-500 mb-4" fill="currentColor" />
+                    <p className="text-lg font-display">
+                      Hover over a folder to see more context
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 

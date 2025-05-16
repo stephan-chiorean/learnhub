@@ -102,6 +102,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const [hoveredAnnotation, setHoveredAnnotation] = useState<string | null>(null);
   const [hoveredFolderName, setHoveredFolderName] = useState<string | null>(null);
   const [isLensMinimized, setIsLensMinimized] = useState(false);
+  const [isLensHovered, setIsLensHovered] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const calculatedNodes = useMemo(() => {
     return Array.from(nodeMap.values());
@@ -284,8 +286,26 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
     }
   }, [toggleFolder, owner, repo, navigate]);
 
+  const clearHoverTimeout = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  };
+
+  const startHoverTimeout = () => {
+    if (isLensHovered) return; // Don't start timeout if lens is hovered
+    clearHoverTimeout();
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredAnnotation(null);
+      setHoveredFolderName(null);
+      setIsLensMinimized(true);
+    }, 4000);
+  };
+
   const onNodeMouseEnter = useCallback((event: React.MouseEvent, node: Node) => {
     if (node.type === 'fileNode' && (node.data as FileNodeData).type === 'directory' && (node.data as FileNodeData).annotation) {
+      clearHoverTimeout();
       setHoveredAnnotation((node.data as FileNodeData).annotation!);
       setHoveredFolderName((node.data as FileNodeData).label);
       setIsLensMinimized(false);
@@ -293,9 +313,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   }, []);
 
   const onNodeMouseLeave = useCallback((event: React.MouseEvent, node: Node) => {
-    setHoveredAnnotation(null);
-    setHoveredFolderName(null);
-    setIsLensMinimized(true);
+    startHoverTimeout();
+  }, [isLensHovered]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      clearHoverTimeout();
+    };
   }, []);
 
   if (isWorkspaceLoading && !directoryTree.length) {
@@ -401,6 +426,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
                 folderName={hoveredFolderName || undefined} 
                 isMinimized={isLensMinimized}
                 onMinimizeChange={setIsLensMinimized}
+                onHoverChange={setIsLensHovered}
               />
             </ReactFlow>
           </div>
