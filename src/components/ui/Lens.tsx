@@ -104,7 +104,7 @@ const Lens: React.FC<LensProps> = ({ text, folderName, isMinimized, onMinimizeCh
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors font-display text-xs shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-orange-500 dark:bg-orange-900 text-white dark:text-orange-200 rounded-lg hover:bg-orange-600 dark:hover:bg-orange-800 transition-colors font-display text-xs shadow-sm hover:shadow-md border border-orange-600 dark:border-orange-600"
               >
                 Step Through
                 <Sparkles className="w-3.5 h-3.5" />

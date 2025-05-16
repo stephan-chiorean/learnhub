@@ -50,8 +50,8 @@ const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data, id }) => {
     <div 
       className={`px-4 py-2 rounded-lg shadow-sm border cursor-pointer select-none h-full flex items-center justify-center transition-all duration-150 ease-in-out ${
         data.type === 'directory'
-          ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30'
-          : 'bg-blue-50/80 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100/80 dark:hover:bg-blue-900/30'
+          ? 'bg-orange-100 dark:bg-orange-900/20 border-orange-300 dark:border-orange-800 hover:bg-orange-200 dark:hover:bg-orange-900/30'
+          : 'bg-blue-100 dark:bg-blue-900/20 border-blue-300 dark:border-blue-800 hover:bg-blue-200 dark:hover:bg-blue-900/30'
       }`}
     >
       {!isRoot && <Handle type="target" position={Position.Top} id="target" />}
@@ -60,7 +60,7 @@ const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data, id }) => {
         <div className="mb-3 flex-shrink-0 scale-125">
           {getFileIcon(data.label, data.type === 'directory' ? 'tree' : 'blob')}
         </div>
-        <span className={`text-base font-medium truncate max-w-[140px] ${data.type === 'file' ? getFileColor(data.label) : 'text-orange-500 dark:text-orange-400'}`}>
+        <span className={`text-base font-medium truncate max-w-[140px] ${data.type === 'file' ? getFileColor(data.label) : 'text-orange-600 dark:text-orange-400'}`}>
           {data.label}
         </span>
       </div>
@@ -378,19 +378,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsWalkthroughOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors font-display text-lg shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
+              className="flex items-center gap-2 px-4 py-2 bg-orange-500 dark:bg-orange-900 text-white dark:text-orange-200 rounded-lg hover:bg-orange-600 dark:hover:bg-orange-800 transition-colors font-display text-lg shadow-sm hover:shadow-md border border-orange-600 dark:border-orange-600"
             >
               Generate Walkthrough
               <RiSparklingLine className="w-5 h-5" />
             </button>
             <button
-              className="flex items-center justify-center w-10 h-10 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
+              className="flex items-center justify-center w-10 h-10 bg-orange-500 dark:bg-orange-900 text-white dark:text-orange-200 rounded-lg hover:bg-orange-600 dark:hover:bg-orange-800 transition-colors shadow-sm hover:shadow-md border border-orange-600 dark:border-orange-600"
             >
               <RiShareLine className="w-5 h-5" />
             </button>
             <button
               onClick={() => setShowNotepad(true)}
-              className="flex items-center justify-center w-10 h-10 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
+              className="flex items-center justify-center w-10 h-10 bg-orange-500 dark:bg-orange-900 text-white dark:text-orange-200 rounded-lg hover:bg-orange-600 dark:hover:bg-orange-800 transition-colors shadow-sm hover:shadow-md border border-orange-600 dark:border-orange-600"
             >
               <PiNotePencilBold className="w-5 h-5" />
             </button>
@@ -434,7 +434,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
             <h1 className="text-3xl font-display text-orange-700 dark:text-orange-400">Code Explorer</h1>
             <button
               onClick={() => setIsChatOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors font-display text-lg shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
+              className="flex items-center gap-2 px-4 py-2 bg-orange-500 dark:bg-orange-900 text-white dark:text-orange-200 rounded-lg hover:bg-orange-600 dark:hover:bg-orange-800 transition-colors font-display text-lg shadow-sm hover:shadow-md border border-orange-600 dark:border-orange-600"
             >
               Ask AI
               <FaComments className="w-5 h-5" />
