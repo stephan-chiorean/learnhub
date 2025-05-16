@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Minus, Moon, Sun, ExternalLink } from 'lucide-react';
+import { Plus, Minus, ExternalLink } from 'lucide-react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { solarizedLight, atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../tooltip';
+import { useTheme } from '../../../context/ThemeContext';
 
 interface CodeBlockProps {
   code: string;
@@ -14,7 +15,7 @@ interface CodeBlockProps {
 
 export const CodeBlock: React.FC<CodeBlockProps> = React.memo(({ code, language, startLine, filePath }) => {
   const [fontSize, setFontSize] = useState(14);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const { mode } = useTheme();
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const navigate = useNavigate();
 
@@ -26,18 +27,16 @@ export const CodeBlock: React.FC<CodeBlockProps> = React.memo(({ code, language,
     setFontSize(prev => Math.max(prev - 2, 10));
   };
 
-  const toggleTheme = () => {
-    setIsDarkMode(prev => !prev);
-  };
-
   const handleNavigateToFile = () => {
     if (owner && repo) {
       navigate(`/workspace/${owner}/${repo}/file?path=${encodeURIComponent(filePath)}`);
     }
   };
 
+  const isDarkMode = mode === 'dark';
+
   return (
-    <div className={`relative rounded-lg border border-gray-300 ${isDarkMode ? 'bg-[#282c34]' : 'bg-[#f8f8f8]'} overflow-hidden group`}>
+    <div className={`relative rounded-lg border border-gray-300 dark:border-gray-600 ${isDarkMode ? 'bg-[#282c34]' : 'bg-[#f8f8f8]'} overflow-hidden group`}>
       {/* Floating zoom controls */}
       <div className="absolute top-2 right-2 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <TooltipProvider>
@@ -53,22 +52,6 @@ export const CodeBlock: React.FC<CodeBlockProps> = React.memo(({ code, language,
             </TooltipTrigger>
             <TooltipContent>
               <p>Open in file viewer</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={toggleTheme}
-                className="p-1 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors shadow-sm"
-                title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-              >
-                {isDarkMode ? <Sun className="w-4 h-4 text-white" /> : <Moon className="w-4 h-4 text-white" />}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{isDarkMode ? "Switch to light mode" : "Switch to dark mode"}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

@@ -7,8 +7,6 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Button } from '../components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { HelpCircle } from 'lucide-react';
-import WalkthroughModal from '../components/ui/walkthrough/walkthrough-modal';
-import { MultiStepModal } from '../components/ui/walkthrough/multi-step-modal';
 
 const Walkthrough: React.FC = () => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
@@ -41,7 +39,7 @@ const Walkthrough: React.FC = () => {
         <div className="w-64 h-64">
           <Lottie animationData={AtomLoader} loop={true} />
         </div>
-        <h2 className="text-3xl font-['Gaegu'] text-orange-700 mt-4">
+        <h2 className="text-3xl font-display text-orange-700 dark:text-orange-400 mt-4">
           Planning your walkthrough...
         </h2>
       </div>
@@ -51,7 +49,7 @@ const Walkthrough: React.FC = () => {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-screen pt-14">
-        <h2 className="text-3xl font-['Gaegu'] text-red-600">
+        <h2 className="text-3xl font-display text-red-600 dark:text-red-400">
           {error}
         </h2>
       </div>
@@ -59,17 +57,17 @@ const Walkthrough: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen mt-8 bg-gray-50 overflow-y-auto">
+    <div className="min-h-screen mt-8 bg-gray-50 dark:bg-gray-900 overflow-y-auto">
       <div className="max-w-4xl mx-auto p-8 pt-14 pb-20">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-2">
-            <h1 className="text-4xl font-['Gaegu'] text-orange-700">
+            <h1 className="text-4xl font-display text-orange-700 dark:text-orange-400">
               Overview
             </h1>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <HelpCircle className="w-5 h-5 text-gray-400 hover:text-gray-600 cursor-pointer" />
+                  <HelpCircle className="w-5 h-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Deselect sections you want to omit</p>
@@ -78,7 +76,7 @@ const Walkthrough: React.FC = () => {
             </TooltipProvider>
           </div>
           <Button 
-            className="bg-orange-500 text-white hover:bg-orange-600 font-['Gaegu'] text-lg"
+            className="bg-orange-500 dark:bg-orange-900 text-white dark:text-orange-200 hover:bg-orange-600 dark:hover:bg-orange-800 font-display text-lg"
             onClick={() => navigate(`/walkthrough/${owner}/${repo}/${plan[0].sectionId}`)}
           >
             Begin Walkthrough
@@ -87,7 +85,7 @@ const Walkthrough: React.FC = () => {
         
         <div className="space-y-8">
           {plan.map((section, index) => (
-            <div key={index} className="bg-white rounded-lg shadow-md p-6 flex gap-4 transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5">
+            <div key={index} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 flex gap-4 transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5">
               <div className="flex items-start pt-1">
                 <Checkbox
                   checked={selectedSections.has(index)}
@@ -97,28 +95,28 @@ const Walkthrough: React.FC = () => {
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="text-2xl font-['Gaegu'] text-orange-600">
+                  <span className="text-2xl font-display text-orange-600 dark:text-orange-400">
                     {index + 1}.
                   </span>
-                  <h2 className="text-2xl font-['Gaegu'] text-orange-600">
+                  <h2 className="text-2xl font-display text-orange-600 dark:text-orange-400">
                     {section.section}
                   </h2>
                 </div>
-                <ul className="list-disc list-inside text-gray-700 mb-4 space-y-2">
+                <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-2">
                   {section.description.map((point, pointIndex) => (
                     <li key={pointIndex}>{point}</li>
                   ))}
                 </ul>
                 <div className="mt-4">
-                  <h3 className="text-lg font-['Gaegu'] text-black mb-2">
+                  <h3 className="text-lg font-display text-black dark:text-white mb-2">
                     Key Files:
                   </h3>
-                  <ul className="list-disc list-inside text-gray-600">
+                  <ul className="list-disc list-inside text-gray-600 dark:text-gray-400">
                     {section.files.map((file, fileIndex) => (
                       <li key={fileIndex}>
                         <button
                           onClick={() => navigate(`/workspace/${owner}/${repo}/file?path=${file}`)}
-                          className="text-orange-500 hover:text-orange-600 hover:underline"
+                          className="text-orange-500 dark:text-orange-400 hover:text-orange-600 dark:hover:text-orange-300 hover:underline"
                         >
                           {file}
                         </button>

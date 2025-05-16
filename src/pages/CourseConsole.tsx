@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Copy, Check, ChevronDown, ChevronUp, BookOpen, Share2, BarChart2, Bookmark, MessageSquare, ChevronDown as ChevronDownIcon } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronUp, BookOpen, Share2, BarChart2, Bookmark, MessageSquare, ChevronDown as ChevronDownIcon, Moon, Sun } from 'lucide-react';
 import { useWalkthrough } from '../context/WalkthroughContext';
+import { useTheme } from '../context/ThemeContext';
 import { getLanguageFromPath } from '../utils/languageDetector';
 import { newcourse } from '../lib/mock/newcourse';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
@@ -46,6 +47,7 @@ const CourseConsole: React.FC = () => {
   const navigate = useNavigate();
   const { plan } = useWalkthrough();
   const { fetchFileContent } = useWorkspace();
+  const { mode, toggleTheme } = useTheme();
   const [lessonPlan] = useState<LessonPlan | null>(newcourse);
   const [copyingStates, setCopyingStates] = useState<{ [key: string]: boolean }>({});
   const [fileContents, setFileContents] = useState<{ [key: string]: FileContent }>({});
@@ -189,16 +191,16 @@ const CourseConsole: React.FC = () => {
   return (
     <div className="flex h-screen">
       <div className="flex-1 overflow-hidden">
-        <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-100 flex items-center px-4 z-20 shadow-sm">
+        <header className="fixed top-0 left-0 right-0 h-14 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex items-center px-4 z-20 shadow-sm">
           <div className="flex items-center gap-8">
             <button
               onClick={() => setIsSectionModalOpen(true)}
-              className="group flex items-center gap-2 hover:bg-orange-50 px-3 py-1.5 rounded-lg transition-colors"
+              className="group flex items-center gap-2 hover:bg-orange-50 dark:hover:bg-orange-900/20 px-3 py-1.5 rounded-lg transition-colors"
             >
-              <h1 className="text-2xl font-['Gaegu'] text-black group-hover:text-orange-700">
+              <h1 className="text-2xl font-display text-black dark:text-white group-hover:text-orange-700 dark:group-hover:text-orange-400">
                 Section 1: {currentSection?.section}
               </h1>
-              <ChevronDownIcon className="w-5 h-5 text-gray-500 group-hover:text-orange-700 transition-colors" />
+              <ChevronDownIcon className="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-orange-700 dark:group-hover:text-orange-400 transition-colors" />
             </button>
             <ProgressSlider 
               totalSteps={lessonPlan?.lessons.reduce((acc, lesson) => acc + lesson.steps.length, 0) || 0}
@@ -209,12 +211,24 @@ const CourseConsole: React.FC = () => {
           <div className="flex-1"></div>
           
           <div className="flex items-center space-x-2">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              aria-label="Toggle theme"
+            >
+              {mode === 'dark' ? (
+                <Sun className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+              ) : (
+                <Moon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+              )}
+            </button>
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setIsChatOpen(true)}
-                    className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                    className="flex items-center justify-center w-10 h-10 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/30 transition-colors shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
                     aria-label="Open Chat"
                   >
                     <MessageSquare className="w-5 h-5" />
@@ -229,7 +243,7 @@ const CourseConsole: React.FC = () => {
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setShowNotepad(!showNotepad)}
-                    className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                    className="flex items-center justify-center w-10 h-10 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/30 transition-colors shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
                     aria-label="Open Notepad"
                   >
                     <BookOpen className="w-5 h-5" />
@@ -243,7 +257,7 @@ const CourseConsole: React.FC = () => {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    className="flex items-center justify-center w-10 h-10 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                    className="flex items-center justify-center w-10 h-10 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/30 transition-colors shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
                   >
                     <Share2 className="w-5 h-5" />
                   </button>
@@ -267,8 +281,8 @@ const CourseConsole: React.FC = () => {
                 <div className="space-y-8">
                   {lessonPlan.lessons.map((lesson, lessonIndex) => (
                     <div key={lessonIndex} className="snap-start pt-4">
-                      <div className="bg-white rounded-lg shadow-md p-6">
-                        <h2 className="text-3xl font-['Gaegu'] text-orange-700">{lesson.title}</h2>
+                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                        <h2 className="text-3xl font-display text-orange-700 dark:text-orange-400">{lesson.title}</h2>
                         <div className="space-y-4">
                           {lesson.steps.map((step, stepIndex) => {
                             const code = getCodeSnippet(step);
@@ -278,7 +292,7 @@ const CourseConsole: React.FC = () => {
                             
                             return (
                               <div key={stepIndex} className="snap-start pt-8">
-                                <div className="bg-gray-50 rounded-lg p-6 transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 group">
+                                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 transition-all duration-200 hover:shadow-xl hover:-translate-y-0.5 group">
                                   <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-4">
                                       <Checkbox
@@ -286,7 +300,7 @@ const CourseConsole: React.FC = () => {
                                         onCheckedChange={() => toggleStep(stepId)}
                                         className="w-6 h-6 border-2 border-orange-500 data-[state=checked]:bg-green-400 data-[state=checked]:border-green-400 transition-all duration-200 hover:border-orange-600 hover:data-[state=checked]:bg-green-500 hover:data-[state=checked]:border-green-500"
                                       />
-                                      <h3 className="text-xl font-['Gaegu'] text-orange-600">{step.title}</h3>
+                                      <h3 className="text-xl font-display text-orange-600 dark:text-orange-400">{step.title}</h3>
                                     </div>
                                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                       {code && (
@@ -296,7 +310,7 @@ const CourseConsole: React.FC = () => {
                                               <TooltipTrigger asChild>
                                                 <button
                                                   onClick={() => handleBookmarkClick(lessonIndex.toString(), stepId)}
-                                                  className="flex items-center justify-center w-7 h-7 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                                                  className="flex items-center justify-center w-7 h-7 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/30 transition-colors shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
                                                 >
                                                   <Bookmark className="w-3.5 h-3.5" />
                                                 </button>
@@ -310,7 +324,7 @@ const CourseConsole: React.FC = () => {
                                               <TooltipTrigger asChild>
                                                 <button
                                                   onClick={() => handleCopyStep(step, stepId)}
-                                                  className="flex items-center justify-center w-7 h-7 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors shadow-sm hover:shadow-md border border-orange-700"
+                                                  className="flex items-center justify-center w-7 h-7 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/30 transition-colors shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
                                                 >
                                                   {copyingStates[stepId] ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
                                                 </button>
@@ -323,7 +337,7 @@ const CourseConsole: React.FC = () => {
                                     </div>
                                   </div>
                                   {code && (
-                                    <div className="mb-4 max-h-[calc(100vh-24rem)] overflow-y-auto border border-gray-300 rounded-lg">
+                                    <div className="mb-4 max-h-[calc(100vh-24rem)] overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg">
                                       <CodeBlock
                                         code={code}
                                         language={getLanguageFromPath(step.filePath || '')}
@@ -333,7 +347,7 @@ const CourseConsole: React.FC = () => {
                                     </div>
                                   )}
                                   <div className="relative">
-                                    <div className="text-gray-700 leading-relaxed font-['Gaegu'] text-xl space-y-2 p-4 bg-gray-200 rounded-lg">
+                                    <div className="text-gray-700 dark:text-gray-300 leading-relaxed font-display text-xl space-y-2 p-4 bg-gray-200 dark:bg-gray-600 rounded-lg">
                                       {step.explanation.map((exp, i) => (
                                         <li key={i} className={!isExpanded && i >= 3 ? 'hidden' : ''}>
                                           {exp}
@@ -343,12 +357,12 @@ const CourseConsole: React.FC = () => {
                                     {shouldShowExpand && (
                                       <button
                                         onClick={() => toggleExplanation(stepId)}
-                                        className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-300 transition-colors"
+                                        className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
                                       >
                                         {isExpanded ? (
-                                          <ChevronUp className="w-5 h-5 text-gray-600" />
+                                          <ChevronUp className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                                         ) : (
-                                          <ChevronDown className="w-5 h-5 text-gray-600" />
+                                          <ChevronDown className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                                         )}
                                       </button>
                                     )}
