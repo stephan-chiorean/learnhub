@@ -43,13 +43,6 @@ interface FileNodeData {
   annotation?: string
 }
 
-// Forward declaration for the new annotation node type's data
-interface HoverAnnotationNodeData {
-  text: string;
-  targetPosition: { x: number; y: number }; // To help position the arrow if needed internally
-  // We might pass more theme related things if the node is in a separate file
-}
-
 const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data, id }) => {
   const isRoot = !data.parentPath;
 
@@ -77,55 +70,8 @@ const FileNode: React.FC<NodeProps<FileNodeData>> = ({ data, id }) => {
   )
 }
 
-// Placeholder for the new HoverAnnotationNode - will be defined properly later
-const HoverAnnotationNodeComponent: React.FC<NodeProps<HoverAnnotationNodeData>> = ({ data }) => {
-  const { mode, theme: appTheme } = useTheme(); 
-  const ARROW_SIZE = 10; // Controls the size of the tail
-
-  return (
-    <div style={{
-      padding: '10px 15px',
-      fontFamily: appTheme.fonts.display.join(','),
-      fontSize: '1.1rem',
-      background: mode === 'dark' ? appTheme.colors.gray[700] : appTheme.colors.gray[100],
-      border: `1px solid ${mode === 'dark' ? appTheme.colors.gray[600] : appTheme.colors.gray[300]}`,
-      borderRadius: appTheme.borderRadius.md, // Rounded corners for the bubble
-      color: mode === 'dark' ? appTheme.colors.gray[50] : appTheme.colors.gray[800],
-      maxWidth: '220px',
-      minWidth: '150px',
-      textAlign: 'left',
-      position: 'relative', // Needed for the pseudo-element tail
-      boxShadow: appTheme.shadows.lg,
-    }} className="nodrag nopan">
-      {data.text.split('\n').slice(0,3).join('\n')}
-      
-      <div
-        style={{
-          position: 'absolute',
-          left: '20px',
-          bottom: '-8px',
-          width: '16px',
-          height: '8px',
-          backgroundColor: mode === 'dark' ? appTheme.colors.gray[700] : appTheme.colors.gray[100],
-          clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
-        }}
-      />
-    </div>
-  );
-};
-
 const nodeTypes: NodeTypes = {
   fileNode: FileNode,
-  hoverAnnotationNode: HoverAnnotationNodeComponent, // Register new type
-}
-
-interface HoveredNodeInfo {
-  id: string;
-  text: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 }
 
 const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
@@ -153,52 +99,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const nodes = useMemo(() => Array.from(nodeMap.values()), [nodeMap])
   const edges = useMemo(() => Array.from(edgeMap.values()), [edgeMap])
 
-  const [hoveredNodeInfo, setHoveredNodeInfo] = useState<HoveredNodeInfo | null>(null);
   const [hoveredAnnotation, setHoveredAnnotation] = useState<string | null>(null);
   const [hoveredFolderName, setHoveredFolderName] = useState<string | null>(null);
   const [isLensMinimized, setIsLensMinimized] = useState(false);
 
   const calculatedNodes = useMemo(() => {
-    let currentNodes = Array.from(nodeMap.values());
-    if (hoveredNodeInfo) {
-      const X_OFFSET_FROM_FOLDER_MIDLINE = 10; // How far right of folder's midline the bubble's effective anchor starts
-      const Y_OFFSET_ABOVE_FOLDER = 15;      // How much vertical gap above the folder
-      const TAIL_OFFSET_FROM_BUBBLE_LEFT = 20; // The 'left: 20px' style for the tail
-      const APPROX_ARROW_TIP_EFFECTIVE_HEIGHT = 10; // How much the tail extends below the bubble's bottom edge
-
-      // Estimate annotation box height - this is the trickiest part without rendering it first.
-      const APPROX_ANNOTATION_BOX_HEIGHT = 80; 
-
-      // Calculate the desired X for the left edge of the annotation bubble
-      const annotationNodeX = hoveredNodeInfo.x + (hoveredNodeInfo.width / 2) 
-                              + X_OFFSET_FROM_FOLDER_MIDLINE 
-                              - TAIL_OFFSET_FROM_BUBBLE_LEFT;
-
-      // Calculate the desired Y for the top edge of the annotation bubble
-      const annotationNodeY = hoveredNodeInfo.y 
-                              - APPROX_ANNOTATION_BOX_HEIGHT 
-                              - APPROX_ARROW_TIP_EFFECTIVE_HEIGHT 
-                              - Y_OFFSET_ABOVE_FOLDER;
-
-      // The point on the folder the tail aims for (e.g., top-center of the folder)
-      const targetPointOnFolderX = hoveredNodeInfo.x + hoveredNodeInfo.width / 2;
-      const targetPointOnFolderY = hoveredNodeInfo.y;
-
-      currentNodes.push({
-        id: 'hover-annotation', 
-        type: 'hoverAnnotationNode',
-        position: { x: annotationNodeX, y: annotationNodeY },
-        data: { 
-          text: hoveredNodeInfo.text, 
-          targetPosition: { x: targetPointOnFolderX, y: targetPointOnFolderY } 
-        },
-        draggable: false,
-        selectable: false,
-        style: { pointerEvents: 'none', zIndex: 1000 }, 
-      });
-    }
-    return currentNodes;
-  }, [nodeMap, hoveredNodeInfo]);
+    return Array.from(nodeMap.values());
+  }, [nodeMap]);
 
   const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState(calculatedNodes)
   const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState(edges)
@@ -220,7 +127,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
 
   const NODE_VERTICAL_SPACING = 240;
   const CHILD_HORIZONTAL_SPACING = 280;
-  const ANNOTATION_OFFSET_Y = 95;
 
   const createNode = useCallback(
     (
