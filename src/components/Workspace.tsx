@@ -195,8 +195,17 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
 
       setNodeMap(newNodes);
       setEdgeMap(newEdges);
+
+      // Fetch annotations for root directories
+      const rootDirectories = directoryTree
+        .filter(item => item.type === 'tree' && !annotationsMap.has(item.path))
+        .map(item => item.path);
+      
+      rootDirectories.forEach(path => {
+        fetchAndSetAnnotation(path);
+      });
     }
-  }, [directoryTree, createNode, annotationsMap]);
+  }, [directoryTree, createNode, annotationsMap, fetchAndSetAnnotation]);
 
   const toggleFolder = useCallback(
     (node: Node) => {

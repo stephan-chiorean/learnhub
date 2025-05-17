@@ -6,7 +6,7 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { Pool } from 'pg';
-import { getCodeChunks, saveCodeChunks } from '../db/index.ts';
+import { getCodeChunks, saveCodeChunks, saveCodeChunkSummaries } from '../db/index.ts';
 import cliProgress from 'cli-progress';
 import { openai } from '../utils/openai.js';
 
@@ -482,13 +482,22 @@ export const embedAndUpsertChunks = async (
       });
 
       // Handle process completion
-      nodeProcess.on('close', (code) => {
+      nodeProcess.on('close', async (code) => {
         if (code !== 0) {
           multibar.stop();
           reject(new Error(`Node process exited with code ${code}`));
           return;
         }
-        resolve();
+
+        try {
+          // Read the summaries file and save to database
+          const summaries = await readCodeChunksFromFile(summariesFile);
+          await saveCodeChunkSummaries(namespace, summaries);
+          resolve();
+        } catch (error) {
+          multibar.stop();
+          reject(error);
+        }
       });
 
       // Handle process errors

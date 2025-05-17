@@ -57,6 +57,7 @@ interface WorkspaceContextType {
   setNamespace: (namespace: string) => void;
   annotationsMap: Map<string, string>;
   fetchAndSetAnnotation: (directoryPath: string) => Promise<void>;
+  clearAnnotations: () => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
@@ -124,13 +125,6 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
                 setDirectoryTree(data.data.directoryTree);
                 const newNamespace = `${owner}_${repo}`;
                 setNamespaceState(newNamespace);
-                if (data.data.annotations) {
-                  const initialAnnotations = new Map<string, string>();
-                  for (const [path, annotation] of Object.entries(data.data.annotations)) {
-                    initialAnnotations.set(path, annotation as string);
-                  }
-                  setAnnotationsMapState(initialAnnotations);
-                }
                 workspaceCreated = true;
               } else if (data.type === 'error') {
                 setError(data.error);
@@ -212,14 +206,18 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const fetchAndSetAnnotation = async (directoryPath: string) => {
     if (annotationsMap.has(directoryPath)) return; // Already fetched
+    if (!namespace) return; // Don't fetch if no namespace
 
     try {
-      const response = await fetch('/api/generateAnnotations', { // Assuming this API base URL is fine
+      const response = await fetch('/api/generateAnnotations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ directories: [directoryPath] }),
+        body: JSON.stringify({ 
+          directories: [directoryPath],
+          namespace 
+        }),
       });
       if (!response.ok) {
         throw new Error(`Failed to fetch annotation for ${directoryPath}`);
@@ -233,6 +231,10 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
       // Optionally set an error state or a placeholder annotation
       setAnnotationsMapState(prevMap => new Map(prevMap).set(directoryPath, "Error fetching annotation."));
     }
+  };
+
+  const clearAnnotations = () => {
+    setAnnotationsMapState(new Map());
   };
 
   return (
@@ -252,7 +254,8 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
       removeAnnotation,
       setNamespace,
       annotationsMap,
-      fetchAndSetAnnotation
+      fetchAndSetAnnotation,
+      clearAnnotations
     }}>
       {children}
     </WorkspaceContext.Provider>

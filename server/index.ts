@@ -20,7 +20,7 @@ import {
 import { Pinecone } from '@pinecone-database/pinecone';
 import { b } from '../baml_client/index.js'
 import { FileMetadata } from '../baml_client/types.js'
-import { getCodeChunks, initializeDatabase, pool } from './db/index.ts';
+import { getCodeChunks, getCodeChunkSummaries, initializeDatabase, pool } from './db/index.ts';
 
 dotenv.config();
 initializeEnvironment();
@@ -48,7 +48,18 @@ const pinecone = new Pinecone({
 app.get('/api/chunks', async (req: Request, res: Response) => {
   const { namespace } = req.query;
   const chunks = await getCodeChunks(namespace as string);
-  res.json(chunks);
+  const summaries = await getCodeChunkSummaries(namespace as string);
+
+  // Combine chunks with their summaries
+  const chunksWithSummaries = chunks.map(chunk => {
+    const summary = summaries.find(s => s.chunk_id === chunk.chunk_id);
+    return {
+      ...chunk,
+      summary: summary?.summary || null
+    };
+  });
+
+  res.json(chunksWithSummaries);
 });
 
 // POST /api/createWorkspace
@@ -105,41 +116,6 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
     res.write(`data: ${JSON.stringify({ type: 'progress', stage: 'tree', message: 'Fetching directory structure...' })}\n\n`);
     const nestedTree = await fetchRepoTree(owner, repo, defaultBranch);
 
-    // Generate annotations for top-level directories
-    const topLevelAnnotations: Record<string, string> = {};
-    if (nestedTree && nestedTree.length > 0) {
-      for (const item of nestedTree) {
-        if (item.type === 'tree') { // 'tree' usually means directory
-          try {
-            const completion = await openai.chat.completions.create({
-              model: "gpt-3.5-turbo",
-              messages: [
-                {
-                  role: "system",
-                  content: "You are an expert technical writer. Given a directory path, provide a very brief, one-sentence description of its likely purpose or the type of files it might contain. Focus on common conventions in software projects."
-                },
-                {
-                  role: "user",
-                  content: `Provide a one-sentence description for the top-level directory: "${item.name}" (path: ${item.path})`
-                }
-              ],
-              temperature: 0.3,
-              max_tokens: 50,
-            });
-            const description = completion.choices[0]?.message?.content?.trim();
-            if (description) {
-              topLevelAnnotations[item.path] = description;
-            } else {
-              topLevelAnnotations[item.path] = `General purpose directory: ${item.name}`;
-            }
-          } catch (e) {
-            console.error(`Error generating annotation for ${item.path}:`, e);
-            topLevelAnnotations[item.path] = `Could not generate annotation for ${item.path}.`;
-          }
-        }
-      }
-    }
-
     // Send final response
     res.write(`data: ${JSON.stringify({
       type: 'complete',
@@ -154,8 +130,7 @@ app.post('/api/createWorkspace', async (req: Request, res: Response) => {
         directoryTree: nestedTree,
         codeChunks,
         clonedPath: tempDir,
-        needsProcessing: !namespaceExists,
-        annotations: topLevelAnnotations,
+        needsProcessing: !namespaceExists
       }
     })}\n\n`);
 
@@ -271,6 +246,11 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       console.log('❌ Missing Pinecone configuration');
       return res.status(500).json({ error: 'Pinecone configuration is missing' });
     }
+
+    // Get code chunk summaries from Postgres
+    console.log('🔍 Fetching code chunk summaries...');
+    const summaries = await getCodeChunkSummaries(namespaceStr);
+    console.log('📊 Found code chunk summaries:', summaries.length);
 
     // Use intelligent file search to find relevant files
     console.log('🔍 Starting intelligent file search...');
@@ -437,7 +417,9 @@ app.post('/api/chat', async (req: Request, res: Response) => {
       .filter(match => match.metadata)
       .map(match => {
         const metadata = match.metadata!;
-        return `File: ${metadata.filePath}\nType: ${metadata.type}\n${metadata.functionName ? `Function: ${metadata.functionName}\n` : ''}Content:\n${metadata.content}\n`;
+        // Find matching summary if available
+        const summary = summaries.find((s: { chunk_id: string; summary: string }) => s.chunk_id === match.id);
+        return `File: ${metadata.filePath}\nType: ${metadata.type}\n${metadata.functionName ? `Function: ${metadata.functionName}\n` : ''}${summary ? `Summary: ${summary.summary}\n` : ''}Content:\n${metadata.content}\n`;
       })
       .join('\n---\n');
 
@@ -692,38 +674,114 @@ Additional task-specific instructions:
 // POST /api/generateAnnotations
 app.post('/api/generateAnnotations', async (req: Request, res: Response) => {
   try {
-    const { directories } = req.body; // Expecting an array of directory paths
+    const { directories, namespace } = req.body;
+    console.log('🔍 Generating annotations for:', directories);
 
     if (!directories || !Array.isArray(directories) || directories.length === 0) {
       return res.status(400).json({ error: 'An array of directory paths is required.' });
+    }
+
+    if (!namespace) {
+      return res.status(400).json({ error: 'Namespace is required.' });
     }
 
     const annotations: Record<string, string> = {};
 
     for (const dirPath of directories) {
       try {
-        // For simplicity, we'll generate a generic description based on the path.
-        // In a real scenario, you might analyze files within the directory.
+        // Get immediate contents of the directory
+        const result = await pool.query(
+          `SELECT DISTINCT 
+            c.file_path,
+            c.type,
+            c.function_name,
+            COUNT(*) OVER (PARTITION BY c.type) as type_count
+          FROM code_chunks c
+          WHERE c.namespace = $1
+          AND (
+            c.file_path = $2 
+            OR c.file_path LIKE $3
+          )
+          AND c.file_path NOT LIKE $4
+          GROUP BY c.file_path, c.type, c.function_name
+          ORDER BY c.file_path ASC`,
+          [
+            namespace,
+            dirPath,
+            `${dirPath}/%`,
+            `${dirPath}/%/%` // Exclude deeper nested files
+          ]
+        );
+
+        // Analyze the immediate contents
+        const contents = result.rows.map((row: any) => ({
+          path: row.file_path,
+          type: row.type,
+          functionName: row.function_name,
+          typeCount: row.type_count
+        }));
+
+        // Count file types
+        const typeCounts = contents.reduce((acc: Record<string, number>, curr: any) => {
+          acc[curr.type] = (acc[curr.type] || 0) + 1;
+          return acc;
+        }, {});
+
+        // Generate a concise description
         const completion = await openai.chat.completions.create({
-          model: "gpt-3.5-turbo", // Cheaper model for simple annotations
+          model: "gpt-3.5-turbo",
           messages: [
             {
               role: "system",
-              content: "You are an expert technical writer. Given a directory path, provide a very brief, one-sentence description of its likely purpose or the type of files it might contain. Focus on common conventions in software projects."
+              content: `You are a technical writer. Create a detailed, two-sentence description of a directory based on its contents.
+Focus on:
+1. The main purpose or theme of the directory
+2. The types of files it contains (e.g., "React components", "API endpoints", "utility functions")
+3. Any notable immediate subdirectories
+4. The overall architecture or design patterns used
+
+Keep it informative and specific. Avoid generic phrases like "contains source code" or "contains files".
+Example good descriptions:
+- "This directory contains React components for user authentication and profile management. It implements a modular architecture with separate components for login, registration, and profile editing."
+- "This directory houses API endpoints for user data and authentication. It follows RESTful principles and includes middleware for request validation and error handling."
+- "This directory contains utility functions for data formatting and validation. It provides reusable helper functions for date manipulation, string processing, and data type conversion."
+- "This directory serves as the main application entry point and core configuration files. It includes the application bootstrap code, environment configuration, and global state management setup."
+
+IMPORTANT:
+- Write exactly two sentences
+- Do not include any prefixes like "Directory:" or "Content:"
+- Do not use quotes
+- Focus on the actual purpose and contents`
             },
             {
               role: "user",
-              content: `Provide a one-sentence description for the directory: "${dirPath}"`
+              content: `Directory: ${dirPath}
+Contents:
+${Object.entries(typeCounts).map(([type, count]) => `${type}: ${count} files`).join('\n')}
+${contents.length > 0 ? `\nSample files:\n${contents.slice(0, 3).map(c => `- ${c.path.split('/').pop()}`).join('\n')}` : ''}`
             }
           ],
           temperature: 0.3,
-          max_tokens: 50,
+          max_tokens: 150,
         });
-        const description = completion.choices[0]?.message?.content?.trim() || `General purpose directory: ${dirPath}`;
-        annotations[dirPath] = description;
+
+        const description = completion.choices[0]?.message?.content?.trim();
+        if (description) {
+          // Clean up any potential formatting issues
+          const cleanDescription = description
+            .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+            .replace(/^(Directory:|Content:)\s*/i, '') // Remove prefixes
+            .replace(/\n/g, ' ') // Replace newlines with spaces
+            .trim();
+          annotations[dirPath] = cleanDescription;
+        } else {
+          // Fallback to a simple description based on the directory name
+          const dirName = dirPath.split('/').pop() || dirPath;
+          annotations[dirPath] = `This directory contains ${dirName} related files and components. It organizes the codebase's ${dirName} functionality in a structured manner.`;
+        }
       } catch (error) {
         console.error(`Error generating annotation for ${dirPath}:`, error);
-        annotations[dirPath] = `Could not generate annotation for ${dirPath}.`;
+        annotations[dirPath] = `Contains ${dirPath.split('/').pop() || dirPath} related files`;
       }
     }
 

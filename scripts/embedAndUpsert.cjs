@@ -26,6 +26,7 @@ if (!chunksFile || !summariesFile || !namespace) {
 
 // Initialize OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
 // Configure Bottleneck for OpenAI rate limits (500 RPM, 30k TPM)
 const gptLimiter = new Bottleneck({
   maxConcurrent: 10,
