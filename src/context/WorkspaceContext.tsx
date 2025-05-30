@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import axios from 'axios';
+import { mockAnnotations } from '../lib/mock/annotations';
 
 export interface Annotation {
   id: string;
@@ -75,7 +76,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   });
   const [progress, setProgress] = useState<ProgressUpdate | null>(null);
   const [chunks, setChunks] = useState<CodeChunk[]>([]);
-  const [annotationsMap, setAnnotationsMapState] = useState<Map<string, string>>(new Map());
+  const [annotationsMap, setAnnotationsMapState] = useState<Map<string, string>>(mockAnnotations);
 
   // Effect to update localStorage when namespace changes
   useEffect(() => {
@@ -205,36 +206,19 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   };
 
   const fetchAndSetAnnotation = async (directoryPath: string) => {
-    if (annotationsMap.has(directoryPath)) return; // Already fetched
-    if (!namespace) return; // Don't fetch if no namespace
-
-    try {
-      const response = await fetch('/api/generateAnnotations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          directories: [directoryPath],
-          namespace 
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch annotation for ${directoryPath}`);
-      }
-      const data = await response.json();
-      if (data.annotations && data.annotations[directoryPath]) {
-        setAnnotationsMapState(prevMap => new Map(prevMap).set(directoryPath, data.annotations[directoryPath]));
-      }
-    } catch (err) {
-      console.error(`Error fetching annotation for ${directoryPath}:`, err);
-      // Optionally set an error state or a placeholder annotation
-      setAnnotationsMapState(prevMap => new Map(prevMap).set(directoryPath, "Error fetching annotation."));
+    // Use mock annotations instead of fetching from server
+    if (annotationsMap.has(directoryPath)) return;
+    
+    // Get annotation from mock data
+    const annotation = mockAnnotations.get(directoryPath);
+    if (annotation) {
+      setAnnotationsMapState(prevMap => new Map(prevMap).set(directoryPath, annotation));
     }
   };
 
   const clearAnnotations = () => {
-    setAnnotationsMapState(new Map());
+    // Reset to mock annotations instead of clearing
+    setAnnotationsMapState(mockAnnotations);
   };
 
   return (

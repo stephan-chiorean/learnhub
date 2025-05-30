@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ProgressSlider } from './courseNotebook';
 import { useWalkthrough, Section } from '../../../context/WalkthroughContext';
+import { useTheme } from '../../../context/ThemeContext';
 
 interface SectionModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ const SectionModal: React.FC<SectionModalProps> = ({ isOpen, onOpenChange, curre
   const navigate = useNavigate();
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const { plan } = useWalkthrough();
+  const { mode, theme } = useTheme();
 
   if (!isOpen) return null;
 
@@ -24,13 +26,13 @@ const SectionModal: React.FC<SectionModalProps> = ({ isOpen, onOpenChange, curre
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30">
-      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col">
-        <div className="p-4 border-b flex items-center justify-between">
-          <h2 className="text-2xl font-['Gaegu'] text-black">Course Navigator</h2>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-30">
+      <div className={`bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col ${theme.shadows.lg}`}>
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h2 className={`text-2xl font-display text-gray-900 dark:text-gray-100`}>Course Navigator</h2>
           <button
             onClick={() => onOpenChange(false)}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
           >
             ✕
           </button>
@@ -45,19 +47,19 @@ const SectionModal: React.FC<SectionModalProps> = ({ isOpen, onOpenChange, curre
                 key={section.sectionId}
                 className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer ${
                   isCurrentSection
-                    ? 'bg-orange-50 border-orange-200'
-                    : 'bg-white border-gray-200 hover:bg-orange-50 hover:border-orange-200'
+                    ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
+                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-200 dark:hover:border-orange-800'
                 }`}
                 onClick={() => handleSectionClick(section.sectionId)}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-['Gaegu'] text-orange-700">
+                  <h3 className={`text-lg font-display text-orange-700 dark:text-orange-400`}>
                     {section.section}
                     {isCurrentSection && (
-                      <span className="ml-2 text-sm text-orange-500">(Current)</span>
+                      <span className="ml-2 text-sm text-orange-500 dark:text-orange-300">(Current)</span>
                     )}
                   </h3>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
                     {section.files.length} files
                   </span>
                 </div>

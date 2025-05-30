@@ -84,7 +84,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
     fetchDirectoryTree, 
     progress, 
     annotationsMap,
-    fetchAndSetAnnotation
+    fetchAndSetAnnotation,
+    clearAnnotations
   } = useWorkspace()
   const { mode, theme } = useTheme()
   const [workspaceAlias, setWorkspaceAlias] = useState(`${owner}/${repo}`)
@@ -104,28 +105,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
   const [isLensMinimized, setIsLensMinimized] = useState(false);
   const [isLensHovered, setIsLensHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const calculatedNodes = useMemo(() => {
-    return Array.from(nodeMap.values());
-  }, [nodeMap]);
-
-  const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState(calculatedNodes)
-  const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState(edges)
-
-  useEffect(() => {
-    setReactFlowNodes(calculatedNodes)
-  }, [calculatedNodes, setReactFlowNodes])
-
-  useEffect(() => {
-    setReactFlowEdges(edges)
-  }, [edges, setReactFlowEdges])
-
-  useEffect(() => {
-    if (owner && repo && !hasFetchedRef.current && !isWorkspaceLoading) {
-      fetchDirectoryTree(owner, repo)
-      hasFetchedRef.current = true
-    }
-  }, [owner, repo, fetchDirectoryTree, isWorkspaceLoading])
+  const hasInitializedRef = useRef(false);
 
   const NODE_VERTICAL_SPACING = 240;
   const CHILD_HORIZONTAL_SPACING = 280;
@@ -183,6 +163,28 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
     [annotationsMap]
   );
 
+  const calculatedNodes = useMemo(() => {
+    return Array.from(nodeMap.values());
+  }, [nodeMap]);
+
+  const [reactFlowNodes, setReactFlowNodes, onNodesChange] = useNodesState(calculatedNodes)
+  const [reactFlowEdges, setReactFlowEdges, onEdgesChange] = useEdgesState(edges)
+
+  useEffect(() => {
+    setReactFlowNodes(calculatedNodes)
+  }, [calculatedNodes, setReactFlowNodes])
+
+  useEffect(() => {
+    setReactFlowEdges(edges)
+  }, [edges, setReactFlowEdges])
+
+  useEffect(() => {
+    if (owner && repo && !hasFetchedRef.current && !isWorkspaceLoading) {
+      fetchDirectoryTree(owner, repo)
+      hasFetchedRef.current = true
+    }
+  }, [owner, repo, fetchDirectoryTree, isWorkspaceLoading])
+
   useEffect(() => {
     if (directoryTree && directoryTree.length > 0) {
       const newNodes = new Map<string, Node>();
@@ -196,16 +198,20 @@ const Workspace: React.FC<WorkspaceProps> = ({ isSidebarOpen }) => {
       setNodeMap(newNodes);
       setEdgeMap(newEdges);
 
-      // Fetch annotations for root directories
-      const rootDirectories = directoryTree
-        .filter(item => item.type === 'tree' && !annotationsMap.has(item.path))
-        .map(item => item.path);
-      
-      rootDirectories.forEach(path => {
-        fetchAndSetAnnotation(path);
-      });
+      // Only clear and fetch annotations on initial load
+      if (!hasInitializedRef.current) {
+        clearAnnotations();
+        const rootDirectories = directoryTree
+          .filter(item => item.type === 'tree')
+          .map(item => item.path);
+        
+        rootDirectories.forEach(path => {
+          fetchAndSetAnnotation(path);
+        });
+        hasInitializedRef.current = true;
+      }
     }
-  }, [directoryTree, createNode, annotationsMap, fetchAndSetAnnotation]);
+  }, [directoryTree, createNode, fetchAndSetAnnotation, clearAnnotations]);
 
   const toggleFolder = useCallback(
     (node: Node) => {

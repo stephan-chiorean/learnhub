@@ -5,7 +5,7 @@ import SyntaxHighlighter from 'react-syntax-highlighter'
 import { solarizedLight, atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs'
 import AnnotationModal from '../components/AnnotationModal'
 import Notepad from '../components/Notepad'
-import { Copy, Check, ArrowLeft, Sun, Moon, Minus, Plus } from 'lucide-react'
+import { Copy, Check, ArrowLeft, Sun, Moon, Minus, Plus, Eye } from 'lucide-react'
 import { SiOpenai } from 'react-icons/si'
 import { PiNotePencilBold } from 'react-icons/pi'
 import { RiSparklingLine } from 'react-icons/ri'
@@ -14,6 +14,8 @@ import AISummaryModal from '../components/AISummaryModal'
 import { getLanguageFromPath } from '../utils/languageDetector'
 import { ScrollArea } from '../components/ui/scroll-area'
 import { useTheme } from '../context/ThemeContext'
+import CodeView from '../components/CodeView'
+import LensModal from '../components/LensModal'
 
 const CodeViewer: React.FC = () => {
   const { owner, repo } = useParams<{ owner: string; repo: string }>()
@@ -44,6 +46,8 @@ const CodeViewer: React.FC = () => {
   const notepadRef = useRef<HTMLDivElement>(null)
   const { mode } = useTheme();
   const [fontSize, setFontSize] = useState(14);
+  const [activeLens, setActiveLens] = useState<'default' | 'commentator' | 'highlighter' | 'puzzle'>('default')
+  const [isLensModalOpen, setIsLensModalOpen] = useState(false)
 
   interface SummaryJSON {
     title: string
@@ -396,14 +400,14 @@ const CodeViewer: React.FC = () => {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      onClick={() => setIsNotepadOpen(!isNotepadOpen)}
+                      onClick={() => setIsLensModalOpen(true)}
                       className="flex items-center justify-center w-10 h-10 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-800 transition-colors shadow-sm hover:shadow-md border border-orange-700 dark:border-orange-600"
                     >
-                      <PiNotePencilBold className="w-5 h-5" />
+                      <Eye className="w-5 h-5" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Open Notepad</p>
+                    <p>Change View</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -487,53 +491,13 @@ const CodeViewer: React.FC = () => {
               </TooltipProvider>
             </div>
 
-            <ScrollArea className="w-full overflow-x-auto">
-              <SyntaxHighlighter
-                language={getLanguageFromPath(currentFile?.path || '')}
-                style={mode === 'dark' ? atomOneDark : solarizedLight}
-                customStyle={{
-                  margin: 0,
-                  padding: '1rem 1rem 0 1rem',
-                  background: mode === 'dark' ? '#282c34' : '#f8f8f8',
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                  fontSize: `${fontSize}px`,
-                  lineHeight: '1.5',
-                  height: 'calc(100vh - 240px)',
-                  maxHeight: 'none',
-                  overflowY: 'auto',
-                }}
-                showLineNumbers
-                wrapLines
-                lineNumberStyle={{
-                  color: mode === 'dark' ? '#636d83' : '#93a1a1',
-                  minWidth: '2.5em',
-                  paddingRight: '1em',
-                  textAlign: 'right',
-                  userSelect: 'none',
-                }}
-                lineProps={(lineNumber) => {
-                  const style = { display: 'block' }
-                  const { lines, selectedLines, hoveredLines, clickedLines } = getHighlightedLines()
-                  
-                  if (clickedLines.includes(lineNumber)) {
-                    return {
-                      style: { ...style, backgroundColor: '#fed7aa', color: 'black' }
-                    }
-                  } else if (selectedLines.includes(lineNumber)) {
-                    return {
-                      style: { ...style, backgroundColor: '#fdba74', color: 'black' }
-                    }
-                  } else if (lines.includes(lineNumber)) {
-                    return {
-                      style: { ...style, backgroundColor: '#fff7ed', color: 'black' }
-                    }
-                  }
-                  return { style }
-                }}
-              >
-                {currentFile?.content || ''}
-              </SyntaxHighlighter>
-            </ScrollArea>
+            <CodeView
+              content={currentFile?.content || ''}
+              path={currentFile?.path || ''}
+              fontSize={fontSize}
+              getHighlightedLines={getHighlightedLines}
+              activeLens={activeLens}
+            />
           </div>
         </div>
       </div>
@@ -560,6 +524,11 @@ const CodeViewer: React.FC = () => {
         onSave={handleSaveAnnotation}
         selection={selection}
         editingNote={editingNote}
+      />
+      <LensModal
+        isOpen={isLensModalOpen}
+        onOpenChange={setIsLensModalOpen}
+        onSelectLens={setActiveLens}
       />
       <AISummaryModal
         isOpen={isAISummaryOpen}

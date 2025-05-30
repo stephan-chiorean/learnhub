@@ -327,6 +327,32 @@ export const readCodeChunksFromFile = async (filePath: string): Promise<any[]> =
   }
 };
 
+// Helper function to format chunk for database
+const formatChunkForDatabase = (chunk: any, namespace: string) => {
+  const relativePath = chunk.relative_path;
+  const pathParts = relativePath.split('/');
+  const fileName = pathParts[pathParts.length - 1];
+  const relativeDir = pathParts.slice(0, -1).join('/');
+  const extension = path.extname(fileName);
+
+  return {
+    namespace,
+    id: chunk.id,
+    file_path: relativePath,
+    file_name: fileName,
+    relative_dir: relativeDir,
+    extension: extension,
+    type: chunk.language || 'unknown',
+    text: '', // We don't store content in the database
+    start_line: chunk.start_line,
+    end_line: chunk.end_line,
+    size: chunk.size || 0,
+    is_test_file: chunk.is_test_file || false,
+    zone_guess: chunk.zone_guess || '',
+    function_name: chunk.function_name || null
+  };
+};
+
 // Helper function to chunk repository
 export const chunkRepository = async (owner: string, repo: string, sessionId: string): Promise<any[]> => {
   const walkthroughDir = path.join('/tmp', 'walkthrough');
@@ -335,50 +361,55 @@ export const chunkRepository = async (owner: string, repo: string, sessionId: st
   const errorFile = path.join(walkthroughDir, `${repo}_errors_${sessionId}.json`);
   const scriptPath = path.join(process.cwd(), '..', 'scripts', 'chunk_repo_unified.py');
 
+  if (!fs.existsSync(repoDir)) {
+    throw new Error(`Repository directory not found: ${repoDir}`);
+  }
+
   return new Promise((resolve, reject) => {
     try {
-      // Spawn the Python process
       const pythonProcess = spawn('python3', [scriptPath, repoDir, outputFile, errorFile], {
         env: { ...process.env }
       });
 
-      // Handle stdout
+      let stdoutData = '';
+      let stderrData = '';
+
       pythonProcess.stdout.on('data', (data) => {
-        const output = data.toString();
-        // Forward the output to console
-        process.stdout.write(output);
+        stdoutData += data.toString();
       });
 
-      // Handle stderr
       pythonProcess.stderr.on('data', (data) => {
-        const error = data.toString();
-        // Forward the error to console
-        process.stderr.write(error);
+        stderrData += data.toString();
       });
 
-      // Handle process completion
       pythonProcess.on('close', async (code) => {
         if (code !== 0) {
-          reject(new Error(`Python process exited with code ${code}`));
+          reject(new Error(`Python process failed with code ${code}`));
           return;
         }
 
         try {
-          // Read and return the code chunks
+          if (!fs.existsSync(outputFile)) {
+            throw new Error(`Output file not found: ${outputFile}`);
+          }
+
           const codeChunksFile = outputFile.replace('.json', '.code.json');
-          const chunks = await readCodeChunksFromFile(codeChunksFile);
           
-          // Save chunks to database
+          if (!fs.existsSync(codeChunksFile)) {
+            throw new Error(`Code chunks file not found: ${codeChunksFile}`);
+          }
+
+          const rawChunks = await readCodeChunksFromFile(codeChunksFile);
           const namespace = `${owner}_${repo}`;
-          await saveCodeChunks(namespace, chunks);
+          const formattedChunks = rawChunks.map(chunk => formatChunkForDatabase(chunk, namespace));
+          await saveCodeChunks(namespace, formattedChunks);
           
-          resolve(chunks);
+          resolve(formattedChunks);
         } catch (error) {
           reject(error);
         }
       });
 
-      // Handle process errors
       pythonProcess.on('error', (error) => {
         reject(error);
       });
@@ -389,7 +420,7 @@ export const chunkRepository = async (owner: string, repo: string, sessionId: st
   });
 };
 
-// Helper function to embed and upsert chunks to Pinecone
+// Helper function to embed and upsert chunks to LanceDB
 export const embedAndUpsertChunks = async (
   owner: string, 
   repo: string, 
@@ -397,112 +428,53 @@ export const embedAndUpsertChunks = async (
   onProgress?: (progress: { stage: string; message: string; progress?: number }) => void
 ): Promise<void> => {
   const walkthroughDir = path.join('/tmp', 'walkthrough');
-  const chunksFile = path.join(walkthroughDir, `${repo}_chunks_${sessionId}.code.json`);
-  const summariesFile = path.join(walkthroughDir, `${repo}_summaries_${sessionId}.json`);
+  const outputFile = path.join(walkthroughDir, `${repo}_chunks_${sessionId}.json`);
+  const chunksFile = outputFile.replace('.json', '.code.json');
   const namespace = `${owner}_${repo}`;
   const scriptPath = path.join(process.cwd(), '..', 'scripts', 'embedAndUpsert.cjs');
 
+  if (!fs.existsSync(chunksFile)) {
+    throw new Error(`Chunks file not found: ${chunksFile}`);
+  }
+
   return new Promise((resolve, reject) => {
     try {
-      // Create progress bars
-      const multibar = new cliProgress.MultiBar({
-        clearOnComplete: false,
-        hideCursor: true,
-        format: '{bar} | {stage} | {value}/{total} | {percentage}%',
-        barCompleteChar: '\u2588',
-        barIncompleteChar: '\u2591',
-        stopOnComplete: true
-      });
-
-      // Create bars for each stage
-      const processingBar = multibar.create(100, 0, { stage: 'Processing' });
-      const embeddingBar = multibar.create(100, 0, { stage: 'Embedding' });
-      const upsertingBar = multibar.create(100, 0, { stage: 'Upserting' });
-
-      // Spawn the Node.js process
-      const nodeProcess = spawn('node', [scriptPath, chunksFile, summariesFile, namespace], {
+      const nodeProcess = spawn('node', [scriptPath, chunksFile, namespace], {
         env: { ...process.env }
       });
 
-      // Handle stdout
       nodeProcess.stdout.on('data', (data) => {
         const output = data.toString();
         try {
-          // Try to parse as JSON for structured progress events
           const progressEvent = JSON.parse(output);
-          if (progressEvent.stage === 'processing') {
-            processingBar.update(Math.round(progressEvent.progress || 0));
+          if (progressEvent.stage) {
             onProgress?.({
-              stage: 'processing',
+              stage: progressEvent.stage,
               message: progressEvent.message,
               progress: progressEvent.progress
             });
-          } else if (progressEvent.stage === 'embedding') {
-            embeddingBar.update(Math.round(progressEvent.progress || 0));
-            onProgress?.({
-              stage: 'embedding',
-              message: progressEvent.message,
-              progress: progressEvent.progress
-            });
-          } else if (progressEvent.stage === 'upserting') {
-            upsertingBar.update(Math.round(progressEvent.progress || 0));
-            onProgress?.({
-              stage: 'upserting',
-              message: progressEvent.message,
-              progress: progressEvent.progress
-            });
-          } else if (progressEvent.stage === 'complete') {
-            multibar.stop();
-            console.log(`\n✅ ${progressEvent.message}`);
-            onProgress?.({
-              stage: 'complete',
-              message: progressEvent.message
-            });
-          } else if (progressEvent.stage === 'error') {
-            multibar.stop();
-            console.error(`\n❌ ${progressEvent.message}`);
-            onProgress?.({
-              stage: 'error',
-              message: progressEvent.message
-            });
-          } else {
-            // For other events, just log the message
-            console.log(output);
           }
         } catch (e) {
-          // If not JSON, just output as is
-          console.log(output);
+          // Ignore non-JSON output
         }
       });
 
-      // Handle stderr
       nodeProcess.stderr.on('data', (data) => {
-        const error = data.toString();
-        console.error(error);
+        // Only log actual errors
+        if (data.toString().includes('error') || data.toString().includes('Error')) {
+          console.error('Script error:', data.toString());
+        }
       });
 
-      // Handle process completion
       nodeProcess.on('close', async (code) => {
         if (code !== 0) {
-          multibar.stop();
           reject(new Error(`Node process exited with code ${code}`));
           return;
         }
-
-        try {
-          // Read the summaries file and save to database
-          const summaries = await readCodeChunksFromFile(summariesFile);
-          await saveCodeChunkSummaries(namespace, summaries);
-          resolve();
-        } catch (error) {
-          multibar.stop();
-          reject(error);
-        }
+        resolve();
       });
 
-      // Handle process errors
       nodeProcess.on('error', (error) => {
-        multibar.stop();
         reject(error);
       });
 
